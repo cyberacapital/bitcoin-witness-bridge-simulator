@@ -6,9 +6,9 @@ One style throughout: solid red bands with white words for headings, light grey
 cards with a coloured bar down the left edge, and white tiles with a red bar on
 top. Red marks the design, grey marks today's way, risks and things not coded,
 green marks the result. The figures are plain SVG on a white ground, so they read
-the same on a light and a dark page. They carry no figure numbers; the README
-gives each one its number, caption and source. Texts are set line by line; if
-you change one, open the file in a browser and check that it still fits its card.
+the same on a light and a dark page. Each carries its own heading, so the README
+adds no captions. Texts are set line by line; if you change one, open the file
+in a browser and check that it still fits its card.
 """
 import pathlib
 from xml.sax.saxutils import escape

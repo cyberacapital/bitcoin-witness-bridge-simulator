@@ -62,6 +62,3 @@ written from first principles.
 - A value the prover supplies inside the encoding goes through `Circuit.hint`
   under the label of the gate that checks it, so the tests can swap in a wrong one.
 - Nothing here may be presented as production-ready or safe for real funds.
-- The README is set out like a policy paper, with numbered paragraphs. After editing
-  it, run `python docs/number.py`. Point at chapters, tables and figures in the
-  text, not at paragraph numbers, which move.
