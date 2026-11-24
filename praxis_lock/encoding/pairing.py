@@ -17,7 +17,9 @@ Two changes keep the size down:
     in the pairing loop's own squarings and the other three parts are
     Frobenius maps, which are linear, so the 353 steps shrink to about 40.
     This is the residue method of Novakovic and Eagen, "On Proving Pairings",
-    worked out again here for these gates.
+    worked out again here for these gates. A third form, the compact one
+    (`assert_pairing_compact`), builds on the folded one and is described
+    where it is defined, near the end of this file.
 
 Every division is replaced by a hint and a multiplication: the prover supplies
 the slope m and the gates check m * denominator = numerator.
@@ -309,11 +311,12 @@ def fq12_mul(a: "FQ12", b: "FQ12") -> "FQ12":
     return _unpack(_mul_packed(_pack(ints(a)), _pack(ints(b))))
 
 
-def miller_value(q2, p1, loop: str = LOOP) -> "FQ12":
+def miller_value(q2, p1, loop=LOOP) -> "FQ12":
     """The same value as `miller_reference`, computed the way the gates compute it.
 
     Used by the prover, which needs the Miller values before it can choose its
-    root. The test suite checks it against the library's loop.
+    root. The test suite checks it against the library's loop. `loop` is a
+    string of bits or a list of signed digits (0, 1, -1); a digit -1 adds -Q.
     """
     (qx, qy), px, py = q2, int(p1[0]), int(p1[1])
     conj = lambda v: FQ2([int(v.coeffs[0]), (-int(v.coeffs[1])) % P])
@@ -329,8 +332,8 @@ def miller_value(q2, p1, loop: str = LOOP) -> "FQ12":
     for bit in loop:
         state["f"] = _mul_packed(state["f"], state["f"])
         step(3 * state["x"] * state["x"] / (2 * state["y"]), state["x"])
-        if bit == "1":
-            step((qy - state["y"]) / (qx - state["x"]), qx)
+        if int(bit):
+            step((qy * int(bit) - state["y"]) / (qx - state["x"]), qx)
     q1 = (conj(qx) * FROB_X, conj(qy) * FROB_Y)
     nq2 = (qx * FROB2_X, -(qy * FROB2_Y))
     step((q1[1] - state["y"]) / (q1[0] - state["x"]), q1[0])
@@ -534,3 +537,280 @@ def assert_pairing_folded(c: Circuit, pairs, numer: "FQ12", denom: "FQ12", loop:
          (-1, as_element(pick[1]), fq12_const(c, ints(targets[2] - targets[0])))],
         [(-1, fq12_const(c, ints(targets[0])))],
         label="pairing equation")
+
+
+# ---------------------------------------------------------------- the compact check
+#
+# Three further savings on top of the folded check.
+#
+# Half-size running product. The final exponentiation sends every element of
+# the subfield F_p^6 to 1, because p^6 - 1 divides (p^12 - 1) / r. So the check
+# never needs the running product itself, only its class up to factors from
+# that subfield. Write an element as a + b w with a, b in F_p^6 (w^2 = v lies
+# in F_p^6); its class is the single F_p^6 number g = a / b, six numbers of
+# the base field where the element itself takes twelve. Classes multiply by
+#
+#     (g1 + w)(g2 + w) = (g1 + g2) (g3 + w)   with   g3 (g1 + g2) = g1 g2 + v,
+#
+# one equation of degree two. Since v is not a square in F_p^6, that equation
+# has no solution with g1 + g2 = 0, so it always means what it says.
+#
+# Merged lines. Each loop step multiplies in one line per pairing. The line of
+# the pairing whose G2 point is fixed, divided by -y of its G1 point, is
+# 1 + b w with b a fixed combination of two numbers stored once (x/y and 1/y).
+# The other pairing's line is l0 + a w with a made of stored numbers. Their
+# product has class tau with  tau (l0 b + a) = l0 + v a b,  again degree two,
+# so both lines enter the running product through one stored class.
+#
+# Signed loop. The loop count 6x+2 is written with digits 0, 1, -1, which has
+# 21 additions where binary has 36. A digit -1 adds -Q and multiplies by c
+# where a digit 1 multiplies by 1/c; the result differs from the binary loop's
+# only by factors from F_p^6.
+#
+# The three-way choice of the folded check disappears: omega lies in F_p^6.
+
+def signed_digits(n: int):
+    """n in digits 0, 1, -1 with no two neighbours non-zero, most significant first."""
+    out = []
+    while n:
+        d = (2 - n % 4) if n & 1 else 0
+        out.append(d)
+        n = (n - d) >> 1
+    return out[::-1]
+
+
+SIGNED_LOOP = signed_digits(ATE)[1:]
+assert signed_digits(ATE)[0] == 1
+
+
+def signed_count(digits) -> int:
+    """The number a list of signed digits counts up to, after a leading 1."""
+    n = 1
+    for d in digits:
+        n = 2 * n + d
+    return n
+
+
+_V = _W * _W
+
+
+def _split(f: "FQ12"):
+    """f = a + b w with a, b in F_p^6 (the even powers of w)."""
+    co = ints(f)
+    return (FQ12([co[i] if i % 2 == 0 else 0 for i in range(12)]),
+            FQ12([co[i + 1] if i % 2 == 0 else 0 for i in range(12)]))
+
+
+def fq6_inverse(x: "FQ12") -> "FQ12":
+    """1/x for x in F_p^6, by solving the six linear equations  x * y = 1.
+
+    Much faster than the library's general inverse; the tests compare the two.
+    """
+    co = ints(x)[0::2]
+    # Column j of the matrix is x * v^j in the basis 1, v, ..., v^5, where v^6 = 18 v^3 - 82.
+    cols, cur = [], list(co)
+    for _ in range(6):
+        cols.append(cur)
+        top = cur[5]
+        cur = [(-82 * top) % P, cur[0], cur[1], (cur[2] + 18 * top) % P, cur[3], cur[4]]
+    rows = [[cols[j][i] for j in range(6)] + [1 if i == 0 else 0] for i in range(6)]
+    for i in range(6):
+        pivot = next(r for r in range(i, 6) if rows[r][i])
+        rows[i], rows[pivot] = rows[pivot], rows[i]
+        scale = pow(rows[i][i], -1, P)
+        rows[i] = [v * scale % P for v in rows[i]]
+        for r in range(6):
+            if r != i and rows[r][i]:
+                f = rows[r][i]
+                rows[r] = [(a - f * b) % P for a, b in zip(rows[r], rows[i])]
+    out = [0] * 12
+    out[0::2] = [rows[i][6] for i in range(6)]
+    return FQ12(out)
+
+
+def torus_class(f: "FQ12") -> "FQ12":
+    """The class of f up to factors from F_p^6: a / b for f = a + b w."""
+    a, b = _split(f)
+    return fq12_mul(a, fq6_inverse(b))
+
+
+def torus_mul(g1: "FQ12", g2: "FQ12") -> "FQ12":
+    """The class of a product, from the classes of its factors."""
+    return fq12_mul(fq12_mul(g1, g2) + _V, fq6_inverse(g1 + g2))
+
+
+@functools.lru_cache(maxsize=None)
+def _torus_frobenius_basis(e: int, sign: int):
+    """The class of (sign*g + w)^(p^e) is linear in g: the images of 1, w^2, ..., w^10."""
+    zeta = fq12_pow(_W, P**e - 1)                      # w^(p^e) = zeta * w
+    assert _split(zeta)[1] == FQ12.zero()               # zeta lies in F_p^6
+    scale = fq6_inverse(zeta) * sign
+    return [fq12_mul(frobenius_basis(e)[i], scale) for i in range(0, 12, 2)]
+
+
+def _fq6_alloc(c: Circuit, value: "FQ12"):
+    """Fresh bits for an element of F_p^6: six numbers, at the even powers of w."""
+    co = ints(value)
+    return [fp_alloc(c, co[i]) if i % 2 == 0 else ZERO for i in range(12)]
+
+
+def _times_v(el):
+    """v times an element of F_p^6, where v = w^2 and w^12 = 18 w^6 - 82."""
+    out = [ZERO] * 12
+    for k in range(0, 10, 2):
+        out[k + 2] = out[k + 2] + el[k]
+    out[6] = out[6] + el[10].scale(18)
+    out[0] = out[0] + el[10].scale(-82)
+    return out
+
+
+def _times(c: Circuit, lin: Lin, k: int, label: str = "compact: constant multiple") -> Lin:
+    """k * lin for a constant k of any size. Free in the wide layout, where
+    constants are reduced before anything is summed; a stored number in the narrow one."""
+    k %= P
+    if c.style == "wide":
+        return lin.scale(k)
+    value = c.hint(label, lin.value() * k % P)
+    out = fp_alloc(c, value)
+    fp_assert(c, [(1, lin, fp_const(c, k))], [(-1, out)], label=label)
+    return out
+
+
+def _t_mul(c: Circuit, g1, v1, g2, v2, label: str):
+    """Fresh bits for the class of a product; one equation of degree two ties it down."""
+    value = c.hint(label, torus_mul(v1, v2))
+    out = _fq6_alloc(c, value)
+    fq12_assert(c, [(1, out, g1), (1, out, g2), (-1, g1, g2)],
+                [(-1, fq12_const(c, ints(_V)))], label=label)
+    return out, value
+
+
+def _t_frobenius(c: Circuit, g, value: "FQ12", e: int, sign: int, label: str):
+    """The class of (sign*g + w)^(p^e), as a fixed linear image of g's six numbers."""
+    basis = _torus_frobenius_basis(e, sign)
+    image_val = FQ12.zero()
+    for coef, image in zip(ints(value)[0::2], basis):
+        image_val = image_val + image * coef
+    if c.style == "wide":
+        out = [ZERO] * 12
+        for i, image in enumerate(basis):
+            for k, coef in enumerate(ints(image)):
+                if coef:
+                    out[k] = out[k] + g[2 * i].scale(coef)
+        return out, image_val
+    image_val = c.hint(label, image_val)
+    out = _fq6_alloc(c, image_val)
+    products = [(1, [g[2 * i]] + [ZERO] * 11, fq12_const(c, ints(basis[i]))) for i in range(6)]
+    fq12_assert(c, products, [(-1, out)], label=label)
+    return out, image_val
+
+
+def _fixed_double(R):
+    """Tangent at a fixed twist point: slope, intercept, and the doubled point. No gates."""
+    x, y = R
+    m = 3 * x * x / (2 * y)
+    nx = m * m - 2 * x
+    return m, y - m * x, (nx, m * (x - nx) - y)
+
+
+def _fixed_add(R, Q):
+    """Chord through two fixed twist points: slope, intercept, and the sum. No gates."""
+    (x, y), (qx, qy) = R, Q
+    m = (qy - y) / (qx - x)
+    nx = m * m - x - qx
+    return m, y - m * x, (nx, m * (x - nx) - y)
+
+
+def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ12",
+                           loop=SIGNED_LOOP, witness=None) -> None:
+    """Assert that  Miller(moving) * Miller(fixed) * numer / denom  becomes 1 under the
+    final exponentiation, storing as little as this package knows how to.
+
+    `moving` is (Q, P) with Q a G2 point made of bits; `fixed` is (Q, P) with Q a
+    constant G2 point. Both P are G1 points made of bits.
+
+    The prover supplies the class g of 1/c, where c^lambda = Miller(...) * numer / denom
+    up to a factor from F_p^6. Nothing ties g down on its own: any g for which
+    the last equation holds proves the claim, because the gates then show that
+    the product equals (g + w)^(-lambda) times an element of F_p^6.
+
+    `loop` and `witness` are for small test instances.
+    """
+    (Q, Pt), (Qf, Ptf) = moving, fixed
+    if Q.const or not Qf.const:
+        raise ValueError("the compact check takes one G2 point made of bits and one constant")
+    if witness is None:
+        product = fq12_mul(miller_value((Q.xv, Q.yv), (Pt.xv, Pt.yv), loop),
+                           miller_value((Qf.xv, Qf.yv), (Ptf.xv, Ptf.yv), loop))
+        witness = residue_witness(product * numer / denom, signed_count(loop) + P - P**2 + P**3)
+    root_val = c.hint("compact: root", witness[0])
+    g_val = torus_class(FQ12.one() / root_val)
+    start = _fq6_alloc(c, g_val)
+    start_val = g_val
+
+    # Two numbers of the fixed pairing's G1 point, and their products with y of the other.
+    def stored(label, value, products, linears):
+        value = c.hint(label, value % P)
+        out = fp_alloc(c, value)
+        fp_assert(c, [(k, out if a is None else a, out if b is None else b) for k, a, b in products],
+                  [(k, out if a is None else a) for k, a in linears], label=label)
+        return out
+
+    y_inv = pow(Ptf.yv, -1, P)
+    rho = stored("compact: x over y", Ptf.xv * y_inv, [(1, None, Ptf.y)], [(-1, Ptf.x)])
+    eta = stored("compact: one over y", y_inv, [(1, None, Ptf.y)], [(-1, fp_const(c, 1))])
+    lam1 = stored("compact: y times x over y", Pt.yv * rho.value(), [(1, Pt.y, rho)], [(-1, None)])
+    lam2 = stored("compact: y times one over y", Pt.yv * eta.value(), [(1, Pt.y, eta)], [(-1, None)])
+
+    def step(g, g_val, line, lv, m, t):
+        """Multiply both pairings' lines into the running class through one stored class."""
+        (m0, m1), (t0, t1) = ints(m), ints(t)
+        b, l0b, b_co = [ZERO] * 12, [ZERO] * 12, [0] * 12
+        for pos, k in ((0, m0 - 9 * m1), (6, m1), (2, t0 - 9 * t1), (8, t1)):
+            source, with_y = (rho, lam1) if pos in (0, 6) else (eta, lam2)
+            b[pos] = _times(c, source, -k)                 # the fixed line over -y is 1 + b w
+            l0b[pos] = _times(c, with_y, k)                # l0 * b, where l0 = -y of the other point
+            b_co[pos] = -k * source.value() % P
+        bv = FQ12(b_co)
+        l0v, av = _split(lv)
+        a = [line[k + 1] if k % 2 == 0 else ZERO for k in range(12)]
+        tau_val = c.hint("compact: lines", fq12_mul(l0v + fq12_mul(_V, fq12_mul(av, bv)),
+                                                    fq6_inverse(fq12_mul(l0v, bv) + av)))
+        tau = _fq6_alloc(c, tau_val)
+        fq12_assert(c, [(1, tau, [l0b[i] + a[i] for i in range(12)]), (-1, _times_v(a), b)],
+                    [(-1, [line[0]] + [ZERO] * 11)], label="compact: lines")
+        return _t_mul(c, g, g_val, tau, tau_val, "compact: step")
+
+    negated = lambda pt: G2Point(pt.x, (-pt.y[0], -pt.y[1]), pt.xv, -pt.yv, pt.const)
+    conj = lambda v: FQ2([int(v.coeffs[0]), (-int(v.coeffs[1])) % P])
+    g, R, Rf = start, Q, (Qf.xv, Qf.yv)
+    for d in loop:
+        g, g_val = _t_mul(c, g, g_val, g, g_val, "compact: square")
+        line, lv, R = _double_step(c, R, Pt)
+        m, t, Rf = _fixed_double(Rf)
+        g, g_val = step(g, g_val, line, lv, m, t)
+        if d:
+            # digit 1: one more factor 1/c, class g0.  digit -1: one more factor c, class -g0.
+            fold = (start, start_val) if d == 1 else ([-x for x in start], FQ12.zero() - start_val)
+            g, g_val = _t_mul(c, g, g_val, fold[0], fold[1], "compact: fold")
+            line, lv, R = _add_step(c, R, Q if d == 1 else negated(Q), Pt)
+            m, t, Rf = _fixed_add(Rf, (Qf.xv, Qf.yv * d))
+            g, g_val = step(g, g_val, line, lv, m, t)
+    q1, nq2 = _frobenius_points(c, Q)
+    f1 = (conj(Qf.xv) * FROB_X, conj(Qf.yv) * FROB_Y)
+    f2 = (Qf.xv * FROB2_X, -(Qf.yv * FROB2_Y))
+    line, lv, R = _add_step(c, R, q1, Pt)
+    m, t, Rf = _fixed_add(Rf, f1)
+    g, g_val = step(g, g_val, line, lv, m, t)
+    line, lv, _ = _add_step(c, R, nq2, Pt, want_sum=False)
+    m, t, _ = _fixed_add(Rf, f2)
+    g, g_val = step(g, g_val, line, lv, m, t)
+
+    # c^(-lambda) still lacks (1/c)^p * c^(p^2) * (1/c)^(p^3): three linear images of the first class.
+    for e, sign, label in ((1, 1, "compact: Frobenius 1"), (2, -1, "compact: Frobenius 2")):
+        image, image_val = _t_frobenius(c, start, start_val, e, sign, label)
+        g, g_val = _t_mul(c, g, g_val, image, image_val, label + " product")
+    image, _ = _t_frobenius(c, start, start_val, 3, 1, "compact: Frobenius 3")
+    target = fq12_const(c, ints(torus_class(denom / numer)))
+    fq12_assert(c, [(1, target, g), (1, target, image), (-1, g, image)],
+                [(-1, fq12_const(c, ints(_V)))], label="pairing equation")

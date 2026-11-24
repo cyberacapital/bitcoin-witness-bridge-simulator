@@ -24,8 +24,8 @@ from py_ecc import optimized_bn128 as ob
 
 from ..field import Q as R, interpolate, inv, pdivmod, peval, pmul, padd, psub, pscale
 from .circuit import Circuit
-from .pairing import (alloc_g1, alloc_g2, assert_pairing_folded, assert_pairing_identity,
-                      const_g2, miller_product, miller_value)
+from .pairing import (alloc_g1, alloc_g2, assert_pairing_compact, assert_pairing_folded,
+                      assert_pairing_identity, const_g2, miller_product, miller_value)
 
 
 @dataclass
@@ -135,8 +135,11 @@ def verify(vk: VerifyingKey, public, proof) -> bool:
     return ob.final_exponentiate(product) == ob.FQ12.one()
 
 
+CHECKS = ("compact", "folded", "root")
+
+
 def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
-                    style: str = "wide", fold: bool = True) -> Circuit:
+                    style: str = "wide", check: str = "compact") -> Circuit:
     """The Groth16 verifier as gates over bits, built with `proof` as the assignment.
 
     The unknown bits are the proof's coordinates plus every intermediate value
@@ -151,10 +154,17 @@ def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
     is an r-th power, which is the verifier's pairing equation.
 
     `style` is the arithmetic layout, "wide" or "narrow" (see `emulated.py`).
-    `fold` chooses how the r-th power is checked: folded into the pairing loop,
-    or as a separate root raised back to its power (see `pairing.py`). The
-    defaults give the smallest statement.
+    `check` chooses how the r-th power is checked (see `pairing.py`):
+
+      "root"     a separate root raised back to its power, 353 steps
+      "folded"   the root folded into the pairing loop
+      "compact"  folded, with the running product stored in half the space,
+                 the two lines of each step merged, and a signed loop
+
+    The defaults give the smallest statement.
     """
+    if check not in CHECKS:
+        raise ValueError(f"check is one of {CHECKS}")
     A, B, C = proof
     c = Circuit(materialize=materialize, style=style)
     a_pt, b_pt, c_pt = alloc_g1(c, A), alloc_g2(c, B), alloc_g1(c, C)
@@ -163,7 +173,10 @@ def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
     L = public_point(vk, public)
     numer = miller_value(vk.gamma_g2, bn.neg(L))
     denom = miller_value(vk.beta_g2, vk.alpha_g1)
-    if fold:
+    if check == "compact":
+        assert_pairing_compact(c, pairs[0], pairs[1], numer, denom)
+        c.mark("the two pairings that involve the proof and the final check, in one loop")
+    elif check == "folded":
         assert_pairing_folded(c, pairs, numer, denom)
         c.mark("the two pairings that involve the proof and the final check, in one loop")
     else:

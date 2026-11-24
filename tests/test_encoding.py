@@ -407,6 +407,45 @@ class TowerAndPairing(unittest.TestCase):
         self.assertNotEqual(pg.fq12_pow(omega, 9), bn.FQ12.one())
         self.assertEqual(pg.fq12_pow(omega, n // r), bn.FQ12.one())
 
+    def test_the_facts_behind_the_half_size_running_product(self):
+        from py_ecc import bn128 as bn
+        from praxis_lock.encoding import pairing as pg
+        FQ12, rng = bn.FQ12, random.Random(11)
+        rand = lambda: FQ12([rng.randrange(P) for _ in range(12)])
+        n, r = P**12 - 1, bn.curve_order
+        f1, f2, sub = rand(), rand(), pg._split(rand())[0]         # sub lies in the half-size subfield
+        # Factors from the subfield vanish under the final exponentiation, so only classes matter.
+        self.assertEqual((n // r) % (P**6 - 1), 0)
+        self.assertEqual(pg.fq12_pow(sub, n // r), FQ12.one())
+        g1, g2 = pg.torus_class(f1), pg.torus_class(f2)
+        self.assertEqual(pg._split(g1)[1], FQ12.zero())               # a class is six numbers
+        self.assertEqual(pg.torus_class(f1 * sub), g1)
+        self.assertEqual(pg.torus_class(f1 * f2), pg.torus_mul(g1, g2))
+        self.assertEqual(pg.torus_class(FQ12.one() / f1), FQ12.zero() - g1)
+        self.assertEqual(pg.fq6_inverse(sub), FQ12.one() / sub)
+        # The three-way choice of the folded check is a subfield factor, so it disappears.
+        self.assertEqual(pg._split(pg.fold_numbers()["omega"])[1], FQ12.zero())
+        # Raising to p^e acts on classes as a fixed linear map.
+        for e, sign in ((1, 1), (2, -1), (3, 1)):
+            image = FQ12.zero()
+            for coef, column in zip(pg.ints(g1)[0::2], pg._torus_frobenius_basis(e, sign)):
+                image = image + column * coef
+            source = f1 if sign == 1 else FQ12.one() / f1
+            self.assertEqual(image, pg.torus_class(pg.fq12_pow(source, P**e)))
+        # Multiplying stored numbers by v is a reshuffle with two small constants.
+        c = Circuit()
+        full = pg._fq6_alloc(c, sub)
+        self.assertEqual([x.value() for x in pg._times_v(full)], pg.ints(pg._V * sub))
+        # The signed loop: same count, fewer additions, same class as the library's loop.
+        digits = pg.signed_digits(pg.ATE)
+        self.assertEqual(pg.signed_count(digits[1:]), pg.ATE)
+        self.assertTrue(all(not (a and b) for a, b in zip(digits, digits[1:])))
+        self.assertEqual((len(pg.SIGNED_LOOP), sum(1 for d in pg.SIGNED_LOOP if d)), (65, 21))
+        A, B = bn.multiply(bn.G1, 5), bn.multiply(bn.G2, 7)
+        signed, binary = pg.miller_value(B, A, pg.SIGNED_LOOP), pg.miller_reference(B, A)
+        self.assertNotEqual(signed, binary)
+        self.assertEqual(pg.torus_class(signed), pg.torus_class(binary))
+
     def test_the_prover_finds_a_root_exactly_when_the_pairing_product_is_one(self):
         from py_ecc import bn128 as bn
         from praxis_lock.encoding import pairing as pg
@@ -442,7 +481,8 @@ class EveryCheckIsNeeded(unittest.TestCase):
 
     # Helper values with no gate of their own name: the last equation catches them.
     CAUGHT_BY = {"root": "pairing equation", "fold: root": "pairing equation",
-                 "fold: choice": "pairing equation"}
+                 "fold: choice": "pairing equation", "compact: root": "pairing equation"}
+    COMPACT_LOOP = [1, -1]              # two doublings, one addition of each sign
 
     @classmethod
     def setUpClass(cls):
@@ -459,6 +499,9 @@ class EveryCheckIsNeeded(unittest.TestCase):
         cls.fold_root = bn.FQ12([rng.randrange(P) for _ in range(12)])
         cls.fold_miller = pg.miller_reference(cls.B, cls.A, "1") * pg.miller_reference(cls.D, bn.neg(cls.C), "1")
         cls.fold_exponent = pg.loop_count("1") + P - P**2 + P**3
+        cls.compact_miller = (pg.miller_value(cls.B, cls.A, cls.COMPACT_LOOP)
+                              * pg.miller_value(cls.D, bn.neg(cls.C), cls.COMPACT_LOOP))
+        cls.compact_exponent = pg.signed_count(cls.COMPACT_LOOP) + P - P**2 + P**3
 
     def pairs(self, c):
         pg = self.pg
@@ -497,6 +540,20 @@ class EveryCheckIsNeeded(unittest.TestCase):
                                  witness=(self.fold_root, choice))
         return c
 
+    def compact(self, tamper=None, materialize=False, style="narrow", shift=0):
+        """A short signed loop with the compact check. `shift` multiplies the
+        right-hand constant by a power of omega, which must make no difference."""
+        pg = self.pg
+        omega = pg.fold_numbers()["powers"][shift]
+        denom = (self.compact_miller * self.numer * omega
+                 / pg.fq12_pow(self.fold_root, self.compact_exponent))
+        c = Circuit(materialize=materialize, style=style)
+        c.tamper = tamper
+        moving, fixed = self.pairs(c)
+        pg.assert_pairing_compact(c, moving, fixed, self.numer, denom, self.COMPACT_LOOP,
+                                  witness=(self.fold_root, 0))
+        return c
+
     @staticmethod
     def wrong(label, occurrence):
         def bump(v):
@@ -505,14 +562,17 @@ class EveryCheckIsNeeded(unittest.TestCase):
             return v + 1 if isinstance(v, int) else v + type(v).one()
         return lambda l, n, v: bump(v) if (l, n) == (label, occurrence) else v
 
-    def sweep(self, build, expected_labels):
-        """Swap in a wrong value for every helper value in turn."""
+    def sweep(self, build, expected_labels, only=None, every=None):
+        """Swap in a wrong value for every helper value in turn. `only` limits
+        the sweep to some labels; `every` thins out the occurrences of others."""
         honest = build(None)
         self.assertTrue(honest.satisfied, honest.failures[:3])
         self.assertEqual(sorted(honest._hints), sorted(expected_labels))
         tried = 0
         for label, count in sorted(honest._hints.items()):
-            for occurrence in range(count):
+            if only is not None and label not in only:
+                continue
+            for occurrence in range(0, count, (every or {}).get(label, 1)):
                 with self.subTest(label, occurrence=occurrence):
                     c = build(self.wrong(label, occurrence))
                     self.assertFalse(c.satisfied)
@@ -527,6 +587,15 @@ class EveryCheckIsNeeded(unittest.TestCase):
                      "Miller: last chord", "Miller: tangent", "add: slope", "add: x", "add: y",
                      "double: slope", "double: x", "double: y", "line: intercept",
                      "line: slope times x_P"]
+    POINT_LABELS = ["Frobenius x", "Frobenius y", "Frobenius^2 x", "Frobenius^2 y", "G1: x squared",
+                    "G2: x squared", "add: slope", "add: x", "add: y", "double: slope", "double: x",
+                    "double: y", "line: intercept", "line: slope times x_P"]
+    COMPACT_LABELS = ["compact: Frobenius 1 product", "compact: Frobenius 2 product", "compact: fold",
+                      "compact: lines", "compact: one over y", "compact: root", "compact: square",
+                      "compact: step", "compact: x over y", "compact: y times one over y",
+                      "compact: y times x over y"]
+    NARROW_ONLY = ["compact: Frobenius 1", "compact: Frobenius 2", "compact: Frobenius 3",
+                   "compact: constant multiple"]
     FOLD_LABELS = ["Miller: fold", "Miller: square", "fold: Frobenius 1", "fold: Frobenius 2",
                    "fold: Frobenius 3", "fold: choice", "fold: first product", "fold: inverse",
                    "fold: one choice", "fold: root", "fold: second product"]
@@ -555,6 +624,52 @@ class EveryCheckIsNeeded(unittest.TestCase):
             tried = self.sweep(lambda tamper: self.folded(1, tamper, style=style),
                                self.MILLER_LABELS + self.FOLD_LABELS)
             self.assertEqual(tried, 48)
+
+    def test_every_helper_value_in_the_compact_check_is_checked(self):
+        labels = self.POINT_LABELS + self.COMPACT_LABELS
+        tried = self.sweep(lambda tamper: self.compact(tamper, style="wide"), labels)
+        self.assertEqual(tried, 58)
+        # The narrow layout runs the same code and stores a few values more; sweep those.
+        tried = self.sweep(lambda tamper: self.compact(tamper, style="narrow"),
+                           labels + self.NARROW_ONLY, only=self.NARROW_ONLY,
+                           every={"compact: constant multiple": 6})
+        self.assertEqual(tried, 11)
+
+    def test_the_compact_check_needs_no_choice(self):
+        """Multiplying the right-hand constant by any power of omega changes
+        nothing: omega lies in the subfield the classes ignore."""
+        for style in STYLES:
+            prints = set()
+            for shift in (0, 1, 2, 5):
+                c = self.compact(style=style, shift=shift)
+                self.assertTrue(c.satisfied, c.failures[:3])
+                prints.add(c.fingerprint())
+            self.assertEqual(len(prints), 1)
+        # A constant that is off by something outside the subfield is refused.
+        pg = self.pg
+        c = Circuit()
+        moving, fixed = self.pairs(c)
+        denom = (self.compact_miller * self.numer * pg.miller_value(self.bn.G2, self.bn.G1, "1")
+                 / pg.fq12_pow(self.fold_root, self.compact_exponent))
+        pg.assert_pairing_compact(c, moving, fixed, self.numer, denom, self.COMPACT_LOOP,
+                                  witness=(self.fold_root, 0))
+        self.assertEqual(set(c.failures), {"pairing equation"})
+
+    def test_the_compact_check_wants_one_point_of_bits_and_one_constant(self):
+        pg = self.pg
+        c = Circuit()
+        moving, fixed = self.pairs(c)
+        for pair in ((moving, moving), (fixed, fixed), (fixed, moving)):
+            with self.assertRaises(ValueError):
+                pg.assert_pairing_compact(c, pair[0], pair[1], self.numer, self.denom, self.COMPACT_LOOP,
+                                          witness=(self.fold_root, 0))
+
+    def test_no_bit_of_a_compact_pairing_computation_is_left_free(self):
+        c = self.compact(materialize=True)
+        self.assertTrue(c.satisfied, c.failures[:3])
+        self.assertGreater(c.n_bits, 200_000)
+        self.assertTrue(holds(c.gates, c.x))
+        self.assertEqual(bits_free_to_flip(c.gates, c.x), [])
 
     def test_the_folded_check_accepts_each_of_its_three_choices_and_only_the_right_one(self):
         pg = self.pg
@@ -611,6 +726,9 @@ class EveryCheckIsNeeded(unittest.TestCase):
         c = self.folded(1, self.wrong("fold: choice", 0), materialize=True)
         self.assertFalse(c.satisfied)
         self.assertFalse(holds(c.gates, c.x))
+        c = self.compact(self.wrong("compact: lines", 3), materialize=True)
+        self.assertFalse(c.satisfied)
+        self.assertFalse(holds(c.gates, c.x))
 
 
 @unittest.skipUnless(HAVE_PAIRINGS, "needs py_ecc")
@@ -636,8 +754,8 @@ class Groth16Verifier(unittest.TestCase):
         self.assertTrue(c.satisfied, c.failures[:3])
         self.assertEqual((c.style, c.max_products), ("wide", 3048))
         # Sizes, pinned so that changes to the encoding are noticed.
-        self.assertTrue(1_400_000 < c.n_bits < 1_460_000, c.n_bits)
-        self.assertTrue(9_900 < c.n_gates < 9_980, c.n_gates)
+        self.assertTrue(700_000 < c.n_bits < 745_000, c.n_bits)
+        self.assertTrue(4_940 < c.n_gates < 5_000, c.n_gates)
 
     def test_a_fresh_proof_of_the_same_statement_also_satisfies_them(self):
         other = self.g.prove(self.r1cs, self.trapdoor, [1, 47053, 223, 211, 223 * 223])
@@ -672,22 +790,26 @@ class Groth16Verifier(unittest.TestCase):
         from py_ecc import bn128 as bn
         g, (A, B, C) = self.g, self.proof
         forged = (A, B, bn.multiply(bn.G1, 12345))
-        expected = {                      # (style, fold): bits, gates, most products in a gate
-            ("wide", False): ((2_480_000, 2_550_000), (17_300, 17_400), 3048),
-            ("narrow", True): ((4_750_000, 4_850_000), (29_250, 29_450), 69),
-            ("narrow", False): ((8_450_000, 8_580_000), (51_500, 51_750), 69),
+        expected = {                      # (style, check): bits, gates, most products in a gate
+            ("wide", "folded"): ((1_400_000, 1_460_000), (9_900, 9_980), 3048),
+            ("wide", "root"): ((2_480_000, 2_550_000), (17_300, 17_400), 3048),
+            ("narrow", "compact"): ((2_950_000, 3_100_000), (18_250, 18_420), 99),
+            ("narrow", "folded"): ((4_750_000, 4_850_000), (29_250, 29_450), 69),
+            ("narrow", "root"): ((8_450_000, 8_580_000), (51_500, 51_750), 69),
         }
         sizes = [self.honest.n_bits]
-        for (style, fold), (bits, gates, widest) in expected.items():
-            with self.subTest(style=style, fold=fold):
-                c = g.encode_verifier(self.vk, [47053], self.proof, style=style, fold=fold)
+        for (style, check), (bits, gates, widest) in expected.items():
+            with self.subTest(style=style, check=check):
+                c = g.encode_verifier(self.vk, [47053], self.proof, style=style, check=check)
                 self.assertTrue(c.satisfied, c.failures[:3])
                 self.assertTrue(bits[0] < c.n_bits < bits[1], c.n_bits)
                 self.assertTrue(gates[0] < c.n_gates < gates[1], c.n_gates)
                 self.assertEqual(c.max_products, widest)
-                self.assertFalse(g.encode_verifier(self.vk, [47053], forged, style=style, fold=fold).satisfied)
+                self.assertFalse(g.encode_verifier(self.vk, [47053], forged, style=style, check=check).satisfied)
                 sizes.append(c.n_bits)
         self.assertEqual(sizes, sorted(sizes))     # each step back is larger
+        with self.assertRaises(ValueError):
+            g.encode_verifier(self.vk, [47053], self.proof, check="tiny")
 
 
 if __name__ == "__main__":

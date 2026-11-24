@@ -6,7 +6,7 @@ Part 1 locks a secret to a statement about BN254 arithmetic, written with the
 encoding's building blocks, and opens it. Part 2 makes a real Groth16 proof,
 writes the Groth16 verifier as lock gates, and shows that the real proof
 satisfies them while forged ones do not. Part 3 builds the same verifier the
-other three ways this package knows, to show what each shrinking step saved.
+earlier ways this package knows, to show what each shrinking step saved.
 
 Research code at toy parameters. The verifier statement is far too large for
 this Python lock to encrypt to; parts 2 and 3 build and check it, and report
@@ -87,17 +87,16 @@ def part_two() -> None:
 
     paper = Params.paper()
     print("\nPART 3  What each shrinking step saved\n")
-    print("       arithmetic   final check        unknown bits     gates   widest gate   times the paper")
-    rows = [("narrow", False), ("narrow", True), ("wide", False), ("wide", True)]
-    for style, fold in rows:
-        other = c if (style, fold) == ("wide", True) else g.encode_verifier(vk, [47053], proof, style=style, fold=fold)
+    print("       arithmetic   final check             unknown bits     gates   widest gate   times the paper")
+    names = {"root": "separate root", "folded": "folded into loop", "compact": "compact (default)"}
+    for style, check in (("narrow", "root"), ("wide", "root"), ("wide", "folded"), ("wide", "compact")):
+        other = c if (style, check) == ("wide", "compact") else g.encode_verifier(vk, [47053], proof, style=style, check=check)
         assert other.satisfied
-        check = "folded into loop" if fold else "separate root"
-        print(f"       {style:<10}   {check:<16} {other.n_bits:>14,} {other.n_gates:>9,} {other.max_products:>13,}"
+        print(f"       {style:<10}   {names[check]:<21} {other.n_bits:>14,} {other.n_gates:>9,} {other.max_products:>13,}"
               f" {other.n_bits / paper.N:>17.1f}")
-    print(f"       the paper's own encoding    {paper.N:>14,} {1692:>9,}  at most 2,047 {1.0:>17.1f}")
+    print(f"       the paper's own encoding         {paper.N:>14,} {1692:>9,}  at most 2,047 {1.0:>17.1f}")
     print("\nThe paper does not say how its encoding is built. This one was written from")
-    print("scratch, is still several times larger, and has known gaps; see the README.")
+    print("scratch, is still nearly twice the size, and has known gaps; see the README.")
 
 
 if __name__ == "__main__":

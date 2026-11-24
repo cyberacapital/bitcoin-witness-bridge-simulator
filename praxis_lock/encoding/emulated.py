@@ -121,7 +121,9 @@ if array.array(_DIGIT).itemsize != 4:                      # pragma: no cover
 
 _DIGIT_ROOM = 1 << 32            # a count of bit pairs must stay below this to fit its digit
 _TABLES = {}
+_RECENT = {}
 _ONES = {}
+_COUNTS = {}
 
 
 def _digits(value: int, n: int):
@@ -143,19 +145,25 @@ def _tables(p: int, k: int, n: int, lam: int):
     """K * 2^s mod p for s < n, as three lists: the low `lam` bits, the rest,
     and both packed into one number, for summing in one pass."""
     key = (p, k, lam)
-    cached = _TABLES.get(key)
+    cached = _TABLES.get(key) or _RECENT.get(key)
     if cached is not None and len(cached[0]) >= n:
         return cached
-    low, high, both, mask, t, shift = [], [], [], (1 << lam) - 1, k, _pack_shift(lam)
+    values, t = [], k
     for _ in range(n):
-        low.append(t & mask)
-        high.append(t >> lam)
-        both.append((t & mask) | ((t >> lam) << shift))
+        values.append(t)
         t <<= 1
         if t >= p:
             t -= p
-    if min(k, p - k) < 1 << 24:          # the handful of small coefficients; keep them
+    mask, shift = (1 << lam) - 1, _pack_shift(lam)
+    low = [t & mask for t in values]
+    high = [t >> lam for t in values]
+    both = [a | (b << shift) for a, b in zip(low, high)]
+    if min(k, p - k) < 1 << 24:          # the handful of small coefficients: keep them for good
         _TABLES[key] = (low, high, both)
+    else:                                # large constants come in runs: keep the latest few
+        if len(_RECENT) >= 256:
+            _RECENT.clear()
+        _RECENT[key] = (low, high, both)
     return low, high, both
 
 
@@ -170,9 +178,11 @@ def _ones(p: int, k: int, lam: int, wa: int, wb: int):
     key = (p, k, lam, wa, wb)
     cached = _ONES.get(key)
     if cached is None:
-        low, high, _ = _tables(p, k, wa + wb - 1, lam)
-        counts = [min(s, wa - 1, wb - 1, wa + wb - 2 - s) + 1 for s in range(wa + wb - 1)]
-        cached = (sum(map(mul, counts, low)), sum(map(mul, counts, high)))
+        counts = _COUNTS.get((wa, wb))
+        if counts is None:               # how many bit pairs have positions adding up to s
+            counts = _COUNTS[(wa, wb)] = [min(s, wa - 1, wb - 1, wa + wb - 2 - s) + 1
+                                          for s in range(wa + wb - 1)]
+        cached = _weigh(counts, _tables(p, k, wa + wb - 1, lam)[2], lam)
         if min(k, p - k) < 1 << 24:
             _ONES[key] = cached
     return cached

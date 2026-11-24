@@ -37,9 +37,9 @@ written from first principles.
   a working exploit of either is still worth having as a test. Anything else is a
   real finding.
 - Make it smaller. The paper reports 391,693 bits and 1,692 constraints; this
-  encoding uses about 1.43 million bits. `Circuit.stages` shows where they go, and
-  the README lists three steps not yet taken.
-- Keep both layouts and both final checks working. The narrow layout is the one
+  encoding uses about 0.72 million bits. `Circuit.stages` shows where they go, and
+  the README names the next step and where our knowledge stops.
+- Keep both layouts and all three final checks working. The narrow layout is the one
   small enough to write out in full and take apart bit by bit, so the tests of
   the pairing's structure run on it.
 - If the authors publish their encoding, compare the two and describe the
