@@ -26,6 +26,11 @@ by the authors, and any errors in it are not theirs. Because it is derived from
 an Apache-2.0 work, this directory is distributed under the Apache License 2.0
 (see LICENSE in this directory); the rest of the repository is MIT.
 
+The subdirectory `encoding/` (statements about BN254 arithmetic and a Groth16
+verifier written as gates) is not derived from the Lean development or from the
+paper's construction. It is original to this project, written from first
+principles, and is distributed under the same Apache License 2.0.
+
 Changes from the original: rewritten in Python; the honest quotient polynomials,
 which the Lean text obtains by an existence argument, are computed explicitly;
 decryption collapses the sums of `evalComb` using the rank-one shape of the

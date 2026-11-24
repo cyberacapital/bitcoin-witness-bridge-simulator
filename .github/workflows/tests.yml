@@ -27,3 +27,5 @@ jobs:
         run: python demo.py
       - name: Run the lock demo with real pairings
         run: python demo_lock.py
+      - name: Run the proof-checker encoding demo
+        run: python demo_encoding.py

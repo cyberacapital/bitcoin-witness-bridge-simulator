@@ -99,10 +99,32 @@ def phi(P: Params, A, e: int, x) -> int:
     return total % Q
 
 
-def form_vectors(P: Params, A):
-    """`formVec`: v[e][c] is the coefficient of x_c in coefficient e of the hash."""
+def form_vectors_literal(P: Params, A):
+    """`formVec` exactly as defined: apply `phi` to each unit vector. Slow."""
     units = [[1 if i == c else 0 for i in range(P.N + 1)] for c in range(P.N + 1)]
     return [[phi(P, A, e, unit) for unit in units] for e in range(P.n)]
+
+
+def form_vectors(P: Params, A):
+    """`formVec`: v[e][c] is the coefficient of x_c in coefficient e of the hash.
+
+    Written out directly: x_c sits at position t of column j, and multiplying by
+    a ring element a moves a_i to position i + t, with a sign flip on wrapping.
+    """
+    out = []
+    for e in range(P.n):
+        block, s = divmod(e, P.d)
+        vec = [0] * (P.N + 1)
+        if block == 0:
+            vec[0] = 1 if s == 0 else 0
+        else:
+            row = A[block - 1]
+            vec[0] = row[0][s]
+            for c in range(1, P.N + 1):
+                j, t = divmod(c - 1, P.d)
+                vec[c] = row[1 + j][s - t] if t <= s else (-row[1 + j][s + P.d - t]) % Q
+        out.append(vec)
+    return out
 
 
 def forms_of(P: Params, seed: bytes):

@@ -77,17 +77,18 @@ def pdivmod(a, b):
     a, b = trim(a), trim(b)
     if not b:
         raise ZeroDivisionError("division by the zero polynomial")
-    quotient = [0] * max(len(a) - len(b) + 1, 0)
-    lead_inv = inv(b[-1])
+    if len(a) < len(b):
+        return [], a
     rem = list(a)
-    while len(rem) >= len(b):
-        shift = len(rem) - len(b)
-        factor = rem[-1] * lead_inv % Q
-        quotient[shift] = factor
-        for i, c in enumerate(b):
-            rem[shift + i] = (rem[shift + i] - factor * c) % Q
-        rem = trim(rem)
-    return trim(quotient), rem
+    lead_inv = inv(b[-1])
+    quotient = [0] * (len(a) - len(b) + 1)
+    for shift in range(len(a) - len(b), -1, -1):
+        factor = rem[shift + len(b) - 1] * lead_inv % Q
+        if factor:
+            quotient[shift] = factor
+            for i, c in enumerate(b):
+                rem[shift + i] = (rem[shift + i] - factor * c) % Q
+    return trim(quotient), trim(rem[:len(b) - 1])
 
 
 def poly_from_roots(roots):
@@ -98,17 +99,28 @@ def poly_from_roots(roots):
     return p
 
 
+def _divide_by_root(master, root: int):
+    """master / (X - root) by synthetic division, for a root of master."""
+    out = [0] * (len(master) - 1)
+    carry = 0
+    for i in range(len(master) - 1, 0, -1):
+        carry = (master[i] + carry * root) % Q
+        out[i - 1] = carry
+    return out
+
+
 def interpolate(xs, ys):
     """The polynomial of degree below len(xs) through the points (xs[k], ys[k])."""
     master = poly_from_roots(xs)
-    out = []
+    out = [0] * len(xs)
     for xk, yk in zip(xs, ys):
         if yk % Q == 0:
             continue
-        numer, rem = pdivmod(master, [(-xk) % Q, 1])
-        assert not rem
-        out = padd(out, pscale(yk * inv(peval(numer, xk)), numer))
-    return out
+        numer = _divide_by_root(master, xk)
+        scale = yk * inv(peval(numer, xk)) % Q
+        for i, c in enumerate(numer):
+            out[i] = (out[i] + scale * c) % Q
+    return trim(out)
 
 
 def lagrange_basis_at(xs, t: int):

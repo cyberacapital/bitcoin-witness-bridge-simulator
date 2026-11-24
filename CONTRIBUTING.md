@@ -25,6 +25,20 @@ show the assumption is weaker or more expensive than the README says.
   than trying every answer. At toy sizes this says little about the scheme, but it
   would expose a transcription error.
 
+## Check the encoding
+
+`praxis_lock/encoding/` writes a Groth16 proof checker as lock gates. It was built
+without the paper's construction to follow.
+
+- Find an assignment that satisfies the verifier gates for a statement that is
+  false. Two routes are already known and listed in the README (a second proof
+  point outside the right subgroup, and point additions with an undefined slope);
+  a working exploit of either is still worth having as a test. Anything else is a
+  real finding.
+- Make it smaller. The paper reports 391,693 bits and 1,694 gates; this encoding
+  uses about 8.5 million bits. `Circuit.stages` shows where they go.
+- Compare it with the paper's own encoding and describe the differences.
+
 ## Improve it
 
 - Model something the README lists as not modelled: Bitcoin reorganisations, fees,
@@ -37,5 +51,7 @@ show the assumption is weaker or more expensive than the README says.
 - Every safety check needs a test that fails when the check is removed.
 - Tests that document a weakness are named `ASSUMPTION`, `KNOWN_LIMIT` or `WARNING`.
 - No dependencies beyond the Python standard library, except the optional `py_ecc`
-  for the BN254 backend of `praxis_lock/`.
+  for the BN254 backend of `praxis_lock/` and for the pairing parts of the encoding.
+- A value the prover supplies inside the encoding goes through `Circuit.hint`
+  under the label of the gate that checks it, so the tests can swap in a wrong one.
 - Nothing here may be presented as production-ready or safe for real funds.

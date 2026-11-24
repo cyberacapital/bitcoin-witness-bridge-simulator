@@ -9,12 +9,16 @@
 > an AI assistant and has not been reviewed by cryptographers. Do not put funds
 > behind anything derived from it without independent audits.
 
-Two things in one repository, both meant to be read, run and attacked:
+Three things in one repository, all meant to be read, run and attacked:
 
 - **`bridge_sim/`** A runnable model of a trust-minimised Bitcoin to Solana bridge
   built on witness encryption, with coin launches priced in the bridged Bitcoin.
 - **`praxis_lock/`** A reference implementation of the witness-encryption scheme
   itself, at toy parameters, with real BN254 pairings.
+- **`praxis_lock/encoding/`** A first encoding of a Groth16 proof checker in the
+  form the lock understands, so that "holds a valid proof" becomes something a
+  key can be locked to. It works on real proofs, and it is about 22 times larger
+  than the encoding the paper reports.
 
 The idea comes from *Praxis: Practical Witness Encryption for NP* (Tse, Vanjani,
 Vesely, [ePrint 2026/2971](https://eprint.iacr.org/2026/2971)): lock a Bitcoin key so
@@ -33,7 +37,8 @@ python demo.py                 # the bridge: deposit, launch a coin, trade, rede
 python demo_lock.py --fast     # the lock, on a backend that hides nothing
 pip install py_ecc
 python demo_lock.py            # the lock with real BN254 pairings (about 25 s)
-python -m unittest -v          # 56 tests, about 35 s with py_ecc, 12 s without
+python demo_encoding.py        # a real Groth16 proof against its checker written as lock gates (about 30 s)
+python -m unittest -v          # 79 tests, about 3 minutes with py_ecc, 30 s without
 ```
 
 ## Try to break it
@@ -86,10 +91,106 @@ What it is not:
 - **Not checked against the paper's text**, only against the Lean definitions. It
   follows Lean where the two differ (the key is derived from the pair of labels of
   the key element and its negation).
-- **Not connected to a proof system.** The paper locks to a Groth16 verifier, so
-  any statement can be used through a proof. That encoding is not built here;
-  statements are written directly as small gate systems.
+- **Not connected to a proof system at a size it can run.** The paper locks to a
+  Groth16 verifier, so any statement can be used through a proof. The verifier is
+  written as lock gates in `praxis_lock/encoding/` (next section), but that
+  statement has millions of bits and this Python lock handles a few thousand.
 - **Not hardened.** No constant-time code, no audit, slow reference pairings.
+
+## The proof checker as a lock statement (`praxis_lock/encoding/`)
+
+The lock understands one kind of statement: a list of simple equations, called
+gates, over unknown bits. To lock a Bitcoin key to "someone holds a valid proof",
+the program that checks a proof has to be rewritten as such a list, so that the
+bits of a valid proof are exactly what solves it. The paper does this for the
+Groth16 proof checker and reports the size of the result. This directory is an
+independent attempt at the same job. It was written from first principles,
+without the paper's construction to follow, so it is a different encoding and a
+much larger one.
+
+How it is built, from the bottom up:
+
+- **Numbers that do not fit.** The lock's equations work modulo one 254-bit prime;
+  a proof checker computes modulo a different one. So every number is written out
+  in bits, the prover supplies the quotient of each multiplication, and the gates
+  check the result piece by piece with carries (`emulated.py`). One multiplication
+  costs 5 gates and about 600 helper bits.
+- **Bigger number systems.** The pairing lives in extensions of that field with 2
+  and 12 coordinates (`fields.py`).
+- **The pairing.** The loop that evaluates a pairing is laid out step by step.
+  Every division is replaced by a value the prover supplies and a multiplication
+  that checks it, and the costly last step is replaced by a root the prover
+  supplies, raised back to its power in gates (`pairing.py`).
+- **The checker.** A small Groth16 system for making real proofs to test with, and
+  `encode_verifier`, which writes its acceptance test as gates (`groth16.py`).
+
+```python
+from praxis_lock.encoding import groth16 as g
+
+r1cs = g.factoring_r1cs()                         # "I know two factors of a public number"
+vk, trapdoor = g.setup(r1cs)
+proof = g.prove(r1cs, trapdoor, [1, 47053, 211, 223, 211 * 211])
+
+g.verify(vk, [47053], proof)                      # True: the ordinary checker
+g.encode_verifier(vk, [47053], proof).satisfied   # True: the same test as lock gates
+g.encode_verifier(vk, [47054], proof).satisfied   # False
+```
+
+Measured size, for one verifying key and one public input:
+
+| Part | Unknown bits | Gates |
+|---|---|---|
+| The proof's three points, each checked to lie on its curve | 8,408 | 46 |
+| The two pairings that involve the proof, sharing one loop | about 4.26 million | 26,097 |
+| The final check, as a root raised back to its power | about 4.24 million | 25,488 |
+| **This encoding, in total** | **about 8.51 million** | **51,631** |
+| The paper's encoding | 391,693 | 1,694 |
+
+No gate holds more than 69 products; the paper's format allows 2,047. The bit count
+moves by a few hundred from one verifying key to another.
+
+What the tests establish:
+
+- Multiplication modulo a foreign prime is exactly right on every possible
+  assignment of two miniature instances: every true product is accepted and no
+  false one is.
+- At full size, flipping any single bit of an honest multiplication is rejected.
+- Field and pairing values computed by the gates equal those of the `py_ecc`
+  library, including the full pairing loop.
+- In a shortened pairing computation, each of the 43 helper values the prover
+  supplies was replaced by a wrong one in turn, with everything after it computed
+  consistently from the wrong value. Each time, the gate meant to check that value
+  objected. None of its 220,000 bits can be flipped without a gate noticing.
+- A real Groth16 proof satisfies the full set of verifier gates. A second,
+  different proof of the same statement satisfies the same gates.
+- The gates depend only on the verifying key and the public input, never on the
+  proof being checked.
+- A proof for the wrong public input, and proofs with each of their three points
+  forged, do not satisfy them.
+- A small statement about BN254 numbers, written with these building blocks, locks
+  and opens through `praxis_lock` end to end.
+- Each safety check in the encoding was removed in turn to confirm some test notices.
+
+What it is not:
+
+- **Not the paper's encoding.** It needs about 22 times as many bits. Scaling the
+  paper's element counts, a ciphertext for it would be about 170 GiB, not 7.9.
+- **Not runnable through this lock at full size.** It can be built and checked in
+  a few seconds, but not encrypted to.
+- **Not proven sound, and known to be incomplete as a checker.** It does not check
+  that the proof's second point lies in the right subgroup, and it does not rule
+  out the special cases of point addition where a slope is undefined. A real
+  encoding must close both. The tests show that the forgeries tried here fail;
+  they do not show that every forgery fails.
+- **Not general.** The verifying key and the public input are fixed into the gates.
+- **Not a proof system to use.** The Groth16 setup and prover here exist to make
+  test proofs; the prover uses the setup's secret numbers.
+
+Where the bits go: half are the root check, and across the whole encoding about
+three quarters of the bits are quotients and carries, not values. Two known ways
+to shrink it are to fold the root check into the pairing loop (the method of
+Novakovic and Eagen's *On Proving Pairings*) and to use the wide gates the lock
+allows.
 
 ## How the bridge works
 
@@ -162,6 +263,7 @@ retired validator set could forge a burn. With it, Bitcoin's block order decides
 |---|---|---|
 | Witness-encryption lock | The bridge model uses a simulated lock: an object that releases its secret only when the rule accepts. The real scheme is in `praxis_lock/`, at toy parameters, not yet wired to the bridge | A public ciphertext of about 8 GB per key piece |
 | The vault rule | Real logic, in plain Python | The same logic compiled into a zero-knowledge circuit |
+| Proof checker as a lock statement | Built and tested on real proofs in `praxis_lock/encoding/`, at about 8.5 million bits with known gaps; not wired to the lock or the bridge | An audited encoding at the paper's size, about 0.4 million bits |
 | Bitcoin | Real proof of work, Merkle proofs and coin tracking at tiny difficulty; no fees or scripts | Bitcoin |
 | Solana | Four validators signing state roots by stake | Over a thousand validators, different signatures, and a light-client proof nobody has shipped in this form |
 | Setup-honesty proof | A direct check (`SealedShare.audit`) | A zero-knowledge proof about an 8 GB file; unsolved at this size |
@@ -252,10 +354,17 @@ praxis_lock/kummer.py    forms from a seed, extension-field weights, the grid of
 praxis_lock/groups.py    exponent backend (no secrecy) and BN254 backend
 praxis_lock/scheme.py    encrypt and decrypt
 praxis_lock/reference.py the decryption sums exactly as the Lean text writes them
+praxis_lock/encoding/circuit.py   builder for gates over bits; counts, checks, fingerprints
+praxis_lock/encoding/emulated.py  arithmetic modulo a foreign prime, with quotients and carries
+praxis_lock/encoding/fields.py    the BN254 base field and its extensions of degree 2 and 12
+praxis_lock/encoding/pairing.py   curve points, the pairing loop and the final check as gates
+praxis_lock/encoding/groth16.py   a small Groth16 system and its verifier as gates
+praxis_lock/encoding/tolock.py    hands a small gate system to the lock
 tests/test_bridge.py     25 bridge tests
 tests/test_launchpad.py  9 launch and trading tests
 tests/test_praxis_lock.py 22 lock tests
-demo.py, demo_lock.py    narrated runs
+tests/test_encoding.py   23 encoding tests
+demo.py, demo_lock.py, demo_encoding.py   narrated runs
 ```
 
 ## Next stages
@@ -263,15 +372,19 @@ demo.py, demo_lock.py    narrated runs
 1. Port the Solana program and the Bitcoin side to real test networks, keeping the
    lock simulated.
 2. Write the vault rule as a zero-knowledge program and prove real burns.
-3. Rewrite the lock in a compiled language with fast polynomial arithmetic, so it
-   can run at the paper's parameters, and build the Groth16 verifier encoding.
-4. Replace the bridge's simulated lock with it, run a real setup, and get
+3. Shrink the proof-checker encoding towards the paper's size and close its known
+   gaps.
+4. Rewrite the lock in a compiled language with fast polynomial arithmetic, so it
+   can run at the paper's parameters.
+5. Replace the bridge's simulated lock with it, run a real setup, and get
    independent audits before any real funds.
 
 ## What stops this from being a real bridge today
 
 - The lock here runs only at toy parameters. No implementation at secure parameters
   exists, here or publicly, and the paper is unreviewed.
+- The proof checker written as a lock statement is about 22 times larger than the
+  paper's and has known gaps, and the lock here cannot encrypt to it.
 - The vault rule is plain Python. A real lock needs it as a zero-knowledge circuit,
   including proofs of Solana finality and of Bitcoin's history since sealing.
 - The setup-honesty proof over an 8 GB ciphertext is an unsolved engineering problem.
@@ -283,7 +396,9 @@ demo.py, demo_lock.py    narrated runs
 MIT licence; see [LICENSE](LICENSE). The `praxis_lock/` directory is derived from
 the authors' Apache-2.0 Lean development and is under the Apache License 2.0; see
 `praxis_lock/NOTICE`. The scheme, its parameters and its proofs are the work of
-David Tse, Nikhil Vanjani and Psi Vesely.
+David Tse, Nikhil Vanjani and Psi Vesely. The encoding in `praxis_lock/encoding/`
+is this project's own and is not theirs; its shortcomings are ours. It uses the
+[py_ecc](https://github.com/ethereum/py_ecc) library as its reference for BN254.
 
 Designed and written with Claude, an AI assistant made by Anthropic, and published
 by CyberaCapital. Corrections and attacks are welcome.
