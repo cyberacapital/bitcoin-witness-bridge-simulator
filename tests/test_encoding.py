@@ -1,9 +1,9 @@
 """Tests for the compiler that turns BN254 arithmetic into lock gates.
 
 Three levels: the foreign-field multiplication that everything rests on
-(checked exhaustively on miniature instances), the pairing computation
-(checked against the py_ecc library), and the Groth16 verifier (checked with
-real proofs).
+(checked exhaustively on miniature instances, in both layouts), the pairing
+computation (checked against the py_ecc library), and the Groth16 verifier
+(checked with real proofs, in every combination of layout and final check).
 
 These show that honest values satisfy the gates and that the tampering tried
 here does not. They are not a soundness proof; the README lists known gaps.
@@ -16,12 +16,13 @@ import unittest
 from collections import defaultdict
 
 from praxis_lock import ExponentGroups, decrypt, encrypt, is_witness
-from praxis_lock.encoding import (Circuit, Lin, P, alloc_big, fp_alloc, fp_assert, fp_const,
-                                  fq2_alloc, fq2_assert, fq12_alloc, fq12_assert)
+from praxis_lock.encoding import (Circuit, Lin, P, alloc_big, emulated, fp_alloc, fp_assert,
+                                  fp_const, fq2_alloc, fq2_assert, fq12_alloc, fq12_assert)
 from praxis_lock.encoding.tolock import lock_statement
 from praxis_lock.field import Q as R
 
 HAVE_PAIRINGS = importlib.util.find_spec("py_ecc") is not None
+STYLES = ("wide", "narrow")
 
 
 def holds(gates, x) -> bool:
@@ -62,8 +63,8 @@ def mini_element(c, value, bits):
 
 class ForeignFieldArithmetic(unittest.TestCase):
     def exhaust(self, build, n_elements, bits, relation):
-        """Try every assignment of every bit. Returns the set of element tuples
-        that some satisfying assignment carries."""
+        """Try every assignment of every bit: nothing false may pass, and
+        everything true must have some assignment that passes."""
         c = build([1] * n_elements)
         seen = set()
         for assignment in itertools.product((0, 1), repeat=c.n_bits):
@@ -78,124 +79,218 @@ class ForeignFieldArithmetic(unittest.TestCase):
         return c
 
     def test_multiplication_is_exact_on_every_assignment_of_a_miniature(self):
-        for p, bits, limb in ((3, 2, 1), (5, 3, 2)):
-            def build(values, p=p, bits=bits, limb=limb):
-                c = Circuit(materialize=True, limb_bits=limb)
+        cases = [("narrow", 3, 2, 1), ("narrow", 5, 3, 2),
+                 ("wide", 3, 2, None), ("wide", 5, 3, None), ("wide", 7, 3, None)]
+        for style, p, bits, limb in cases:
+            def build(values, style=style, p=p, bits=bits, limb=limb):
+                c = Circuit(materialize=True, limb_bits=limb or 85, style=style)
                 a, b, out = (mini_element(c, v, bits) for v in values)
                 fp_assert(c, [(1, a, b)], [(-1, out)], p=p)
                 return c
-            with self.subTest(p=p, limb_bits=limb):
+            with self.subTest(style=style, p=p):
                 self.exhaust(build, 3, bits, lambda a, b, out, p=p: (a * b - out) % p == 0)
 
-    def test_negative_terms_and_small_multiples_on_a_miniature(self):
-        def build(values):
-            c = Circuit(materialize=True, limb_bits=1)
-            a, b, d = (mini_element(c, v, 2) for v in values)
-            fp_assert(c, [(1, a, b), (-2, d, d)], [(1, a)], p=3)     # a b - 2 d^2 + a = 0 mod 3
-            return c
-        self.exhaust(build, 3, 2, lambda a, b, d: (a * b - 2 * d * d + a) % 3 == 0)
+    def test_negative_terms_squares_and_small_multiples_on_a_miniature(self):
+        for style in STYLES:
+            def build(values, style=style):
+                c = Circuit(materialize=True, limb_bits=1, style=style)
+                a, b, d = (mini_element(c, v, 2) for v in values)
+                fp_assert(c, [(1, a, b), (-2, d, d)], [(1, a)], p=3)     # a b - 2 d^2 + a = 0 mod 3
+                return c
+            with self.subTest(style=style):
+                self.exhaust(build, 3, 2, lambda a, b, d: (a * b - 2 * d * d + a) % 3 == 0)
 
     def test_bn254_multiplication_and_its_size(self):
         rng = random.Random(1)
-        for _ in range(20):
-            a, b = rng.randrange(P), rng.randrange(P)
-            for product, expected in ((a * b % P, True), ((a * b + 1) % P, False)):
-                c = Circuit(materialize=True)
-                x, y, z = fp_alloc(c, a), fp_alloc(c, b), fp_alloc(c, product)
-                fp_assert(c, [(1, x, y)], [(-1, z)])
-                self.assertEqual(c.satisfied, expected)
-                # The builder's verdict is the gates' verdict, evaluated independently.
-                self.assertEqual(holds(c.gates, c.x), expected)
-        self.assertEqual((c.n_gates, c.max_products), (5, 3))
-        self.assertLess(c.n_bits, 1400)
+        for style in STYLES:
+            for _ in range(10):
+                a, b = rng.randrange(P), rng.randrange(P)
+                for product, expected in ((a * b % P, True), ((a * b + 1) % P, False)):
+                    c = Circuit(materialize=True, style=style)
+                    x, y, z = fp_alloc(c, a), fp_alloc(c, b), fp_alloc(c, product)
+                    fp_assert(c, [(1, x, y)], [(-1, z)])
+                    self.assertEqual(c.satisfied, expected)
+                    # The builder's verdict is the gates' verdict, evaluated independently.
+                    self.assertEqual(holds(c.gates, c.x), expected)
+            helper_bits = c.n_bits - 3 * 254
+            if style == "wide":
+                self.assertEqual((c.n_gates, c.max_products), (2, 254))
+                self.assertLess(helper_bits, 40)
+            else:
+                self.assertEqual((c.n_gates, c.max_products), (5, 3))
+                self.assertLess(helper_bits, 640)
+
+    def test_mixed_claims_agree_with_independent_evaluation(self):
+        """Random claims with products, squares, constants and linear terms:
+        the builder says yes exactly when the claim is true, and the stored
+        gates, evaluated by code that shares nothing with it, say the same."""
+        rng = random.Random(6)
+        for style in STYLES:
+            for trial in range(12):
+                values = [rng.randrange(P) for _ in range(4)]
+                k1, k2 = rng.randrange(-90, 90), rng.randrange(1, 90)
+                constant = rng.randrange(P)
+                a, b, d, e = values
+                target = (k1 * a * b + 4 * b * a + k2 * d * d + 3 * e * constant + 2 * 7 * constant
+                          - 5 * a + e + 11) % P
+                for shift, expected in ((0, True), (1, False)):
+                    c = Circuit(materialize=True, style=style)
+                    xs = [fp_alloc(c, v) for v in values]
+                    out = fp_alloc(c, (target + shift) % P)
+                    fp_assert(c, [(k1, xs[0], xs[1]), (k2, xs[2], xs[2]),
+                                  (4, xs[1], xs[0]),                          # the same product, turned round
+                                  (3, xs[3], fp_const(c, constant)),          # number times constant
+                                  (1, fp_const(c, constant), xs[3]),          # constant times number
+                                  (-1, xs[3], fp_const(c, constant)),         # (these two cancel)
+                                  (2, fp_const(c, 7), fp_const(c, constant))],  # constant times constant
+                              [(-5, xs[0]), (1, xs[3]), (-1, out), (1, fp_const(c, 11))])
+                    self.assertEqual(c.satisfied, expected, (style, trial))
+                    self.assertEqual(holds(c.gates, c.x), expected, (style, trial))
+
+    def test_a_carry_below_zero_is_handled(self):
+        """In the wide layout the carry between the two halves can be negative,
+        so it is stored with an offset. Modulo 7 the constant for bit 2 is 4,
+        all of it in the high half; seven such terms add to 28 = 4 * 7, the low
+        half comes to 0, and the carry is 0 - 4 * 3 over 4, which is -3."""
+        for count, expected in ((7, True), (6, False), (14, True)):
+            c = Circuit(materialize=True, style="wide")
+            pairs = [(mini_element(c, 4, 3), mini_element(c, 1, 3)) for _ in range(count)]
+            fp_assert(c, [(1, a, b) for a, b in pairs], [], p=7)
+            self.assertEqual(c.satisfied, expected, count)
+            self.assertEqual(holds(c.gates, c.x), expected, count)
 
     def test_extreme_operands(self):
-        for a, b in ((0, 0), (P - 1, P - 1), (2**254 - 1, 2**254 - 1), (1, P - 1), (0, 2**254 - 1)):
-            c = Circuit()
-            x = Lin([(1, alloc_big(c, a, 254))])
-            y = Lin([(1, alloc_big(c, b, 254))])
-            z = fp_alloc(c, a * b)
-            fp_assert(c, [(1, x, y)], [(-1, z)])
-            self.assertTrue(c.satisfied, (a, b))
+        for style in STYLES:
+            for a, b in ((0, 0), (P - 1, P - 1), (2**254 - 1, 2**254 - 1), (1, P - 1), (0, 2**254 - 1)):
+                c = Circuit(materialize=True, style=style)
+                x = Lin([(1, alloc_big(c, a, 254))])
+                y = Lin([(1, alloc_big(c, b, 254))])
+                z = fp_alloc(c, a * b)
+                fp_assert(c, [(1, x, y)], [(-1, z)])
+                self.assertTrue(c.satisfied, (style, a, b))
+                self.assertTrue(holds(c.gates, c.x), (style, a, b))
 
     def test_every_single_bit_of_the_honest_assignment_matters(self):
         rng = random.Random(2)
         a, b = rng.randrange(P), rng.randrange(P)
-        c = Circuit(materialize=True)
-        x, y, z = fp_alloc(c, a), fp_alloc(c, b), fp_alloc(c, a * b)
-        fp_assert(c, [(1, x, y)], [(-1, z)])
-        self.assertTrue(holds(c.gates, c.x))
-        for i in range(1, len(c.x)):
-            flipped = list(c.x)
-            flipped[i] ^= 1
-            self.assertFalse(holds(c.gates, flipped), i)
-        self.assertEqual(bits_free_to_flip(c.gates, c.x), [])      # the fast check agrees
+        for style in STYLES:
+            c = Circuit(materialize=True, style=style)
+            x, y, z = fp_alloc(c, a), fp_alloc(c, b), fp_alloc(c, a * b)
+            fp_assert(c, [(1, x, y)], [(-1, z)])
+            self.assertTrue(holds(c.gates, c.x))
+            self.assertEqual(bits_free_to_flip(c.gates, c.x), [])
+            # The fast check above, confirmed the slow way on a spread of bits.
+            for i in range(1, len(c.x), 1 if style == "narrow" else 37):
+                flipped = list(c.x)
+                flipped[i] ^= 1
+                self.assertFalse(holds(c.gates, flipped), (style, i))
 
     def test_the_fast_flip_check_finds_a_bit_that_nothing_constrains(self):
-        c = Circuit(materialize=True)
-        x, y = fp_alloc(c, 3), fp_alloc(c, 5)
-        fp_assert(c, [(1, x, x)], [(-1, fp_const(c, 9))])           # y appears in no gate
-        free = bits_free_to_flip(c.gates, c.x)
-        self.assertEqual(free, list(range(255, 509)))
+        for style in STYLES:
+            c = Circuit(materialize=True, style=style)
+            x, y = fp_alloc(c, 3), fp_alloc(c, 5)
+            fp_assert(c, [(1, x, x)], [(-1, fp_const(c, 9))])           # y appears in no gate
+            self.assertEqual(bits_free_to_flip(c.gates, c.x), list(range(255, 509)))
 
     def test_the_statement_does_not_depend_on_the_values_assigned(self):
-        def build(a, b, out, target=None):
-            c = Circuit(materialize=True)
-            x, y, z = fp_alloc(c, a), fp_alloc(c, b), fp_alloc(c, out)
-            fp_assert(c, [(1, x, y)], [(-1, z)])
-            if target is not None:
-                fp_assert(c, [], [(1, z), (-1, fp_const(c, target))])
-            return c
-        one, two = build(3, 5, 15), build(P - 2, 12345, 99)
-        self.assertEqual(one.gates, two.gates)
-        self.assertEqual(one.fingerprint(), two.fingerprint())
-        self.assertNotEqual(one.x, two.x)
-        # A different constant in the statement is a different statement.
-        self.assertNotEqual(build(3, 5, 15, target=15).fingerprint(),
-                            build(3, 5, 15, target=16).fingerprint())
+        for style in STYLES:
+            def build(a, b, out, target=None):
+                c = Circuit(materialize=True, style=style)
+                x, y, z = fp_alloc(c, a), fp_alloc(c, b), fp_alloc(c, out)
+                fp_assert(c, [(1, x, y)], [(-1, z)])
+                if target is not None:
+                    fp_assert(c, [], [(1, z), (-1, fp_const(c, target))])
+                return c
+            one, two = build(3, 5, 15), build(P - 2, 12345, 99)
+            self.assertEqual(one.gates, two.gates)
+            self.assertEqual(one.fingerprint(), two.fingerprint())
+            self.assertNotEqual(one.x, two.x)
+            # A different constant in the statement is a different statement.
+            self.assertNotEqual(build(3, 5, 15, target=15).fingerprint(),
+                                build(3, 5, 15, target=16).fingerprint())
+        self.assertNotEqual(Circuit(style="wide").style, Circuit(style="narrow").style)
+        with self.assertRaises(ValueError):
+            Circuit(style="medium")
 
-    def test_limbs_too_wide_for_the_locks_field_are_refused_when_building(self):
-        """The limb equations must stay far below r, or 'equal modulo r' would
-        no longer mean 'equal'. Limbs of 126 bits multiply to 252 bits, and a
-        few of those added together pass r / 2."""
+    def test_gates_too_large_for_the_locks_field_are_refused_when_building(self):
+        """Every gate must stay far below r, or 'equal modulo r' would no longer
+        mean 'equal'. Narrow: limbs of 126 bits multiply to 252 bits, and a few
+        of those added together pass r / 2. Wide: a modulus of 480 bits has
+        halves of 240 bits, and thousands of those added together pass it too."""
         for limb_bits in (126, 200, 254, 300):     # the last two put everything in one limb
-            c = Circuit(limb_bits=limb_bits)
+            c = Circuit(limb_bits=limb_bits, style="narrow")
             x, y, z = fp_alloc(c, 3), fp_alloc(c, 5), fp_alloc(c, 15)
             with self.assertRaises(OverflowError):
                 fp_assert(c, [(1, x, y)], [(-1, z)])
+        big = (1 << 480) + 3
+        for bits in (120, 480):                    # few terms: fine. Many: refused.
+            c = Circuit(style="wide")
+            x, y, z = (Lin([(1, alloc_big(c, v, bits))]) for v in (3, 5, 15))
+            if bits == 120:
+                fp_assert(c, [(1, x, y)], [(-1, z)], p=big)
+                self.assertTrue(c.satisfied)
+            else:
+                with self.assertRaises(OverflowError):
+                    fp_assert(c, [(1, x, y)], [(-1, z)], p=big)
+
+    def test_the_bit_counting_trick_has_room_for_its_counts(self):
+        """The wide layout counts pairs of set bits in 32-bit digits. A claim
+        with so many products that a count could overflow is refused."""
+        saved = emulated._DIGIT_ROOM
+        try:
+            emulated._DIGIT_ROOM = 200             # pretend digits hold less than one product's worth
+            c = Circuit(style="wide")
+            x, y, z = fp_alloc(c, 3), fp_alloc(c, 5), fp_alloc(c, 15)
+            with self.assertRaises(OverflowError):
+                fp_assert(c, [(1, x, y)], [(-1, z)])
+        finally:
+            emulated._DIGIT_ROOM = saved
+        self.assertEqual(saved, 1 << 32)
+
+    def test_the_lock_gets_one_more_point_per_gate_than_the_widest_gate_has_products(self):
+        from praxis_lock.encoding.tolock import lock_params
+        for products, expected_u in ((1, 2), (2, 4), (3, 4), (4, 8), (7, 8), (8, 16)):
+            c = Circuit(materialize=True)
+            bits = [c.alloc(1, 1) for _ in range(products)]
+            c.gate([(1, b, b) for b in bits], products, [])          # 1 + 1 + ... = products
+            self.assertTrue(c.satisfied)
+            self.assertEqual(lock_params(c).U, expected_u)
 
     def test_values_wider_than_their_bits_are_refused(self):
-        c = Circuit()
-        alloc_big(c, 2**254, 254)
-        self.assertFalse(c.satisfied)
+        for style in STYLES:
+            c = Circuit(style=style)
+            alloc_big(c, 2**254, 254)
+            self.assertFalse(c.satisfied)
         for value in (4, -1):
             c = Circuit()
             c.alloc(value, 2)
             self.assertFalse(c.satisfied)
 
     def test_a_statement_about_bn254_goes_through_the_lock(self):
-        """Lock a secret to "I know a square root of T modulo p"."""
+        """Lock a secret to "I know a square root of T modulo p", in both layouts."""
         rng = random.Random(3)
         root = rng.randrange(P)
         target = root * root % P
+        for style in STYLES:
+            def build(y):
+                c = Circuit(materialize=True, style=style)
+                value = fp_alloc(c, y)
+                fp_assert(c, [(1, value, value)], [(-1, fp_const(c, target))])
+                return c
 
-        def build(y):
-            c = Circuit(materialize=True)
-            value = fp_alloc(c, y)
-            fp_assert(c, [(1, value, value)], [(-1, fp_const(c, target))])
-            return c
-
-        honest = build(root)
-        params, statement, x = lock_statement(honest)
-        self.assertTrue(is_witness(params, statement, x))
-        G = ExponentGroups()
-        message = secrets.token_bytes(32)
-        ct = encrypt(G, params, statement, message)
-        self.assertEqual(decrypt(G, params, statement, ct, x), message)
-        self.assertEqual(decrypt(G, params, statement, ct, build(P - root).x), message)
-        wrong = build((root + 1) % P)
-        self.assertFalse(wrong.satisfied)
-        self.assertIsNone(decrypt(G, params, statement, ct, wrong.x))
+            honest = build(root)
+            params, statement, x = lock_statement(honest)
+            self.assertTrue(is_witness(params, statement, x))
+            G = ExponentGroups()
+            message = secrets.token_bytes(32)
+            ct = encrypt(G, params, statement, message)
+            self.assertEqual(decrypt(G, params, statement, ct, x), message)
+            if style == "wide":
+                self.assertEqual(decrypt(G, params, statement, ct, build(P - root).x), message)
+            wrong = build((root + 1) % P)
+            self.assertFalse(wrong.satisfied)
+            self.assertIsNone(decrypt(G, params, statement, ct, wrong.x))
+        self.assertLess(honest.n_bits, 900)
 
 
 @unittest.skipUnless(HAVE_PAIRINGS, "needs py_ecc")
@@ -208,31 +303,59 @@ class TowerAndPairing(unittest.TestCase):
         b2 = bn.FQ2([rng.randrange(P), rng.randrange(P)])
         a12 = bn.FQ12([rng.randrange(P) for _ in range(12)])
         b12 = bn.FQ12([rng.randrange(P) for _ in range(12)])
-        for right, expected in ((a2 * b2, True), (a2 * b2 + bn.FQ2([1, 0]), False)):
-            c = Circuit()
-            fq2_assert(c, [(1, fq2_alloc(c, ints(a2)), fq2_alloc(c, ints(b2)))],
-                       [(-1, fq2_alloc(c, ints(right)))])
-            self.assertEqual(c.satisfied, expected)
-        for right, expected in ((a12 * b12, True), (a12 * b12 + bn.FQ12([0] * 11 + [1]), False)):
-            c = Circuit()
-            fq12_assert(c, [(1, fq12_alloc(c, ints(a12)), fq12_alloc(c, ints(b12)))],
-                        [(-1, fq12_alloc(c, ints(right)))])
-            self.assertEqual(c.satisfied, expected)
+        for style in STYLES:
+            for right, expected in ((a2 * b2, True), (a2 * b2 + bn.FQ2([1, 0]), False)):
+                c = Circuit(style=style)
+                fq2_assert(c, [(1, fq2_alloc(c, ints(a2)), fq2_alloc(c, ints(b2)))],
+                           [(-1, fq2_alloc(c, ints(right)))])
+                self.assertEqual(c.satisfied, expected)
+            for right, expected in ((a12 * b12, True), (a12 * b12 + bn.FQ12([0] * 11 + [1]), False)):
+                c = Circuit(style=style)
+                fq12_assert(c, [(1, fq12_alloc(c, ints(a12)), fq12_alloc(c, ints(b12)))],
+                            [(-1, fq12_alloc(c, ints(right)))])
+                self.assertEqual(c.satisfied, expected)
+
+    def test_fast_arithmetic_used_by_the_prover_matches_the_library(self):
+        from py_ecc import bn128 as bn
+        from praxis_lock.encoding import pairing as pg
+        rng = random.Random(8)
+        x = bn.FQ12([rng.randrange(P) for _ in range(12)])
+        y = bn.FQ12([rng.randrange(P) for _ in range(12)])
+        self.assertEqual(pg.fq12_mul(x, y), x * y)
+        for e in (0, 1, 2, 77, 2**70 + 12345):
+            self.assertEqual(pg.fq12_pow(x, e), x ** e)
+        self.assertEqual(pg.frobenius_value(x, 1), pg.fq12_pow(x, P))
+        self.assertEqual(pg.frobenius_value(x, 3), pg.fq12_pow(x, P**3))
+        A, B = bn.multiply(bn.G1, 5), bn.multiply(bn.G2, 7)
+        for loop in ("", "0", "1", "1101", pg.LOOP):
+            self.assertEqual(pg.miller_value(B, A, loop), pg.miller_reference(B, A, loop))
+        self.assertEqual(pg.loop_count(pg.LOOP), pg.ATE)
 
     def test_points_off_the_curve_are_refused(self):
         from py_ecc import bn128 as bn
         from praxis_lock.encoding import pairing as pg
         g1, g2 = bn.multiply(bn.G1, 5), bn.multiply(bn.G2, 7)
-        for build, good, bad in (
-            (pg.alloc_g1, g1, (g1[0], g1[1] + 1)),
-            (pg.alloc_g2, g2, (g2[0], g2[1] + bn.FQ2([1, 0]))),
-        ):
-            c = Circuit()
-            build(c, good)
-            self.assertTrue(c.satisfied)
-            c = Circuit()
-            build(c, bad)
-            self.assertFalse(c.satisfied)
+        for style in STYLES:
+            for build, good, bad in (
+                (pg.alloc_g1, g1, (g1[0], g1[1] + 1)),
+                (pg.alloc_g2, g2, (g2[0], g2[1] + bn.FQ2([1, 0]))),
+            ):
+                c = Circuit(style=style)
+                build(c, good)
+                self.assertTrue(c.satisfied)
+                c = Circuit(style=style)
+                build(c, bad)
+                self.assertFalse(c.satisfied)
+
+    def test_a_point_in_the_wide_layout_has_no_free_bit(self):
+        """Small enough to write out in full: every gate of a G1 point's curve
+        check, evaluated independently, with each bit flipped in turn."""
+        from py_ecc import bn128 as bn
+        from praxis_lock.encoding import pairing as pg
+        c = Circuit(materialize=True, style="wide")
+        pg.alloc_g1(c, bn.multiply(bn.G1, 5))
+        self.assertTrue(holds(c.gates, c.x))
+        self.assertEqual(bits_free_to_flip(c.gates, c.x), [])
 
     def test_miller_loop_gates_reproduce_the_library_value(self):
         from py_ecc import bn128 as bn
@@ -242,27 +365,69 @@ class TowerAndPairing(unittest.TestCase):
         a, b, d, k = (rng.randrange(1, bn.curve_order) for _ in range(4))
         A, B = bn.multiply(bn.G1, a), bn.multiply(bn.G2, b)
         D, C = bn.multiply(bn.G2, d), bn.multiply(bn.G1, k)
-        c = Circuit()
-        acc = pg.miller_product(c, [(pg.alloc_g2(c, B), pg.alloc_g1(c, A)),
-                                    (pg.const_g2(c, D), pg.alloc_g1(c, C).neg())])
-        self.assertTrue(c.satisfied, c.failures[:3])
         reference = pg.miller_reference(B, A) * pg.miller_reference(D, bn.neg(C))
-        self.assertEqual(acc.val, reference)
-        self.assertEqual(fq12_value(acc.lin), pg.ints(reference))
+        for style in STYLES:
+            c = Circuit(style=style)
+            acc = pg.miller_product(c, [(pg.alloc_g2(c, B), pg.alloc_g1(c, A)),
+                                        (pg.const_g2(c, D), pg.alloc_g1(c, C).neg())])
+            self.assertTrue(c.satisfied, c.failures[:3])
+            self.assertEqual(acc.val, reference)
+            self.assertEqual(fq12_value(acc.lin), pg.ints(reference))
 
     def test_pairing_equation_accepts_true_products_and_rejects_false_ones(self):
-        """e(aG1, bG2) = e(G1, G2)^(ab): true for the right exponent, false otherwise."""
+        """e(aG1, bG2) = e(G1, G2)^(ab): true for the right exponent, false
+        otherwise. Once with a separate root, once folded into the loop."""
         from py_ecc import bn128 as bn
         from praxis_lock.encoding import pairing as pg
         a, b = 1234567, 7654321
         A, B = bn.multiply(bn.G1, a), bn.multiply(bn.G2, b)
         one = bn.FQ12.one()
         for scalar, expected in ((a * b, True), (a * b + 1, False)):
-            c = Circuit()
-            acc = pg.miller_product(c, [(pg.alloc_g2(c, B), pg.alloc_g1(c, A))])
             other = pg.miller_reference(bn.G2, bn.multiply(bn.G1, scalar % bn.curve_order))
+            c = Circuit(style="narrow")
+            acc = pg.miller_product(c, [(pg.alloc_g2(c, B), pg.alloc_g1(c, A))])
             pg.assert_pairing_identity(c, acc, one, other)
             self.assertEqual(c.satisfied, expected)
+            c = Circuit(style="wide")
+            pg.assert_pairing_folded(c, [(pg.alloc_g2(c, B), pg.alloc_g1(c, A))], one, other)
+            self.assertEqual(c.satisfied, expected)
+            if not expected:
+                self.assertEqual(set(c.failures), {"pairing equation"})
+
+    def test_the_number_facts_behind_the_folded_check(self):
+        from py_ecc import bn128 as bn
+        from praxis_lock.encoding import pairing as pg
+        import math
+        numbers = pg.fold_numbers()
+        n, r, omega = P**12 - 1, bn.curve_order, numbers["omega"]
+        self.assertEqual(pg.LAMBDA % r, 0)                        # a lambda-th power is an r-th power
+        self.assertEqual(math.gcd(pg.LAMBDA, n), 3 * r)
+        self.assertEqual((n // r) % 27, 0)                        # so omega^h = 1
+        self.assertEqual(pg.fq12_pow(omega, 27), bn.FQ12.one())
+        self.assertNotEqual(pg.fq12_pow(omega, 9), bn.FQ12.one())
+        self.assertEqual(pg.fq12_pow(omega, n // r), bn.FQ12.one())
+
+    def test_the_prover_finds_a_root_exactly_when_the_pairing_product_is_one(self):
+        from py_ecc import bn128 as bn
+        from praxis_lock.encoding import pairing as pg
+        powers = pg.fold_numbers()["powers"]
+        a, b = 1234567, 7654321
+        A, B = bn.multiply(bn.G1, a), bn.multiply(bn.G2, b)
+        true_product = pg.miller_value(B, A) / pg.miller_value(bn.G2, bn.multiply(bn.G1, a * b))
+        root, j0 = pg.residue_witness(true_product)
+        self.assertEqual(pg.fq12_pow(root, pg.LAMBDA), true_product * powers[j0])
+        # Multiplying by powers of omega keeps it an r-th power and walks through all three choices.
+        seen = set()
+        for k in range(3):
+            f = true_product * powers[-k % 27]
+            c, j = pg.residue_witness(f)
+            self.assertEqual(j, (j0 + k) % 3)
+            self.assertEqual(pg.fq12_pow(c, pg.LAMBDA), f * powers[j])
+            seen.add(j)
+        self.assertEqual(seen, {0, 1, 2})
+        false_product = true_product * pg.miller_value(bn.G2, bn.G1)
+        c, j = pg.residue_witness(false_product)
+        self.assertNotEqual(pg.fq12_pow(c, pg.LAMBDA), false_product * powers[j])
 
 
 @unittest.skipUnless(HAVE_PAIRINGS, "needs py_ecc")
@@ -275,6 +440,10 @@ class EveryCheckIsNeeded(unittest.TestCase):
     can then object is the gate meant to check that value, so it must.
     """
 
+    # Helper values with no gate of their own name: the last equation catches them.
+    CAUGHT_BY = {"root": "pairing equation", "fold: root": "pairing equation",
+                 "fold: choice": "pairing equation"}
+
     @classmethod
     def setUpClass(cls):
         from py_ecc import bn128 as bn
@@ -284,22 +453,32 @@ class EveryCheckIsNeeded(unittest.TestCase):
         cls.D, cls.C = bn.multiply(bn.G2, 11), bn.multiply(bn.G1, 13)
         cls.numer = pg.miller_reference(bn.multiply(bn.G2, 3), bn.G1, "1")
         cls.denom = pg.miller_reference(bn.G2, bn.multiply(bn.G1, 9), "1")
+        # For the folded check on a short loop the test plays prover: it picks
+        # the root and sets the constant on the right so that the claim is true.
+        rng = random.Random(9)
+        cls.fold_root = bn.FQ12([rng.randrange(P) for _ in range(12)])
+        cls.fold_miller = pg.miller_reference(cls.B, cls.A, "1") * pg.miller_reference(cls.D, bn.neg(cls.C), "1")
+        cls.fold_exponent = pg.loop_count("1") + P - P**2 + P**3
 
-    def miller(self, tamper=None, materialize=False, root=False):
+    def pairs(self, c):
+        pg = self.pg
+        return [(pg.alloc_g2(c, self.B), pg.alloc_g1(c, self.A)),
+                (pg.const_g2(c, self.D), pg.alloc_g1(c, self.C).neg())]
+
+    def miller(self, tamper=None, materialize=False, root=False, style="narrow"):
         """One doubling, one addition and the closing steps, for a proof pair
         and a fixed pair; optionally followed by a root check with exponent 19."""
         pg = self.pg
-        c = Circuit(materialize=materialize)
+        c = Circuit(materialize=materialize, style=style)
         c.tamper = tamper
-        acc = pg.miller_product(c, [(pg.alloc_g2(c, self.B), pg.alloc_g1(c, self.A)),
-                                    (pg.const_g2(c, self.D), pg.alloc_g1(c, self.C).neg())], loop="1")
+        acc = pg.miller_product(c, self.pairs(c), loop="1")
         if root:
             pg.assert_pairing_identity(c, acc, self.numer, self.denom, order=19)
         return c, acc
 
-    def root_only(self, tamper=None):
+    def root_only(self, tamper=None, style="narrow"):
         pg = self.pg
-        c = Circuit()
+        c = Circuit(style=style)
         c.tamper = tamper
         acc = pg.Acc()
         acc.val = self.numer * self.denom
@@ -307,43 +486,117 @@ class EveryCheckIsNeeded(unittest.TestCase):
         pg.assert_pairing_identity(c, acc, self.numer, self.denom, order=19)
         return c
 
+    def folded(self, choice=0, tamper=None, materialize=False, style="narrow"):
+        """The same short loop with the final check folded in."""
+        pg = self.pg
+        omega_j = pg.fold_numbers()["powers"][choice]
+        denom = self.fold_miller * self.numer * omega_j / pg.fq12_pow(self.fold_root, self.fold_exponent)
+        c = Circuit(materialize=materialize, style=style)
+        c.tamper = tamper
+        pg.assert_pairing_folded(c, self.pairs(c), self.numer, denom, "1",
+                                 witness=(self.fold_root, choice))
+        return c
+
     @staticmethod
     def wrong(label, occurrence):
-        bump = lambda v: v + 1 if isinstance(v, int) else v + type(v).one()
+        def bump(v):
+            if isinstance(v, tuple):               # the two choice bits: set both
+                return (1, 1)
+            return v + 1 if isinstance(v, int) else v + type(v).one()
         return lambda l, n, v: bump(v) if (l, n) == (label, occurrence) else v
 
-    def test_the_short_loop_matches_the_library(self):
-        bn, pg = self.bn, self.pg
-        c, acc = self.miller()
-        self.assertTrue(c.satisfied, c.failures[:3])
-        self.assertEqual(acc.val, pg.miller_reference(self.B, self.A, "1")
-                         * pg.miller_reference(self.D, bn.neg(self.C), "1"))
-
-    def test_every_helper_value_in_the_miller_loop_is_checked(self):
-        honest, _ = self.miller()
-        hints = dict(honest._hints)
-        self.assertEqual(len(hints), 18)
-        for label, count in sorted(hints.items()):
-            for occurrence in range(count):
-                with self.subTest(label, occurrence=occurrence):
-                    c, _ = self.miller(self.wrong(label, occurrence))
-                    self.assertIn(label, c.failures)
-                    # Same statement as before; only the answer changed.
-                    self.assertEqual(c.fingerprint(), honest.fingerprint())
-
-    def test_every_helper_value_in_the_root_check_is_checked(self):
-        honest = self.root_only()
+    def sweep(self, build, expected_labels):
+        """Swap in a wrong value for every helper value in turn."""
+        honest = build(None)
         self.assertTrue(honest.satisfied, honest.failures[:3])
-        self.assertEqual(honest._hints, {"root": 1, "root: square": 4, "root: multiply": 2})
+        self.assertEqual(sorted(honest._hints), sorted(expected_labels))
+        tried = 0
         for label, count in sorted(honest._hints.items()):
             for occurrence in range(count):
                 with self.subTest(label, occurrence=occurrence):
-                    c = self.root_only(self.wrong(label, occurrence))
-                    self.assertIn("pairing equation" if label == "root" else label, c.failures)
-                    self.assertIn("pairing equation", c.failures)
+                    c = build(self.wrong(label, occurrence))
+                    self.assertFalse(c.satisfied)
+                    self.assertIn(self.CAUGHT_BY.get(label, label), c.failures)
+                    # Same statement as before; only the answer changed.
+                    self.assertEqual(c.fingerprint(), honest.fingerprint())
+                    tried += 1
+        return tried
+
+    MILLER_LABELS = ["Frobenius x", "Frobenius y", "Frobenius^2 x", "Frobenius^2 y",
+                     "G1: x squared", "G2: x squared", "Miller: Frobenius chord", "Miller: chord",
+                     "Miller: last chord", "Miller: tangent", "add: slope", "add: x", "add: y",
+                     "double: slope", "double: x", "double: y", "line: intercept",
+                     "line: slope times x_P"]
+    FOLD_LABELS = ["Miller: fold", "Miller: square", "fold: Frobenius 1", "fold: Frobenius 2",
+                   "fold: Frobenius 3", "fold: choice", "fold: first product", "fold: inverse",
+                   "fold: one choice", "fold: root", "fold: second product"]
+
+    def test_the_short_loop_matches_the_library(self):
+        bn, pg = self.bn, self.pg
+        for style in STYLES:
+            c, acc = self.miller(style=style)
+            self.assertTrue(c.satisfied, c.failures[:3])
+            self.assertEqual(acc.val, pg.miller_reference(self.B, self.A, "1")
+                             * pg.miller_reference(self.D, bn.neg(self.C), "1"))
+
+    def test_every_helper_value_in_the_miller_loop_is_checked(self):
+        for style in STYLES:
+            tried = self.sweep(lambda tamper: self.miller(tamper, style=style)[0], self.MILLER_LABELS)
+            self.assertEqual(tried, 36)
+
+    def test_every_helper_value_in_the_root_check_is_checked(self):
+        for style in STYLES:
+            tried = self.sweep(lambda tamper: self.root_only(tamper, style=style),
+                               ["root", "root: square", "root: multiply"])
+            self.assertEqual(tried, 7)
+
+    def test_every_helper_value_in_the_folded_check_is_checked(self):
+        for style in STYLES:
+            tried = self.sweep(lambda tamper: self.folded(1, tamper, style=style),
+                               self.MILLER_LABELS + self.FOLD_LABELS)
+            self.assertEqual(tried, 48)
+
+    def test_the_folded_check_accepts_each_of_its_three_choices_and_only_the_right_one(self):
+        pg = self.pg
+        for style in STYLES:
+            for choice in range(3):
+                self.assertTrue(self.folded(choice, style=style).satisfied)
+        # The right-hand constant was made for choice 2; claiming 0 or 1 must fail.
+        omega2 = pg.fold_numbers()["powers"][2]
+        denom = self.fold_miller * self.numer * omega2 / pg.fq12_pow(self.fold_root, self.fold_exponent)
+        for claimed, expected in ((0, False), (1, False), (2, True)):
+            c = Circuit()
+            pg.assert_pairing_folded(c, self.pairs(c), self.numer, denom, "1",
+                                     witness=(self.fold_root, claimed))
+            self.assertEqual(c.satisfied, expected)
+
+    def test_setting_both_choice_bits_is_refused_even_when_the_equation_would_hold(self):
+        """The right-hand side of the last equation is picked by two bits. With
+        both set it would be a fourth value that is none of the three allowed.
+        Here the constants are arranged so that this fourth value is exactly
+        what the left-hand side comes to, so the last equation holds and the
+        only gate left to object is the one that forbids setting both bits."""
+        pg, bn = self.pg, self.bn
+        powers = pg.fold_numbers()["powers"]
+        left = self.fold_miller / pg.fq12_pow(self.fold_root, self.fold_exponent)
+        # left = denom/numer * (1/omega + 1/omega^2 - 1)  defines denom
+        denom = left * self.numer / (powers[26] + powers[25] - bn.FQ12.one())
+        for style in STYLES:
+            c = Circuit(style=style)
+            c.tamper = self.wrong("fold: one choice", 0)
+            pg.assert_pairing_folded(c, self.pairs(c), self.numer, denom, "1",
+                                     witness=(self.fold_root, 0))
+            self.assertEqual(set(c.failures), {"fold: one choice"})
 
     def test_no_bit_of_a_whole_pairing_computation_is_left_free(self):
         c, _ = self.miller(materialize=True, root=True)
+        self.assertTrue(c.satisfied, c.failures[:3])
+        self.assertGreater(c.n_bits, 200_000)
+        self.assertTrue(holds(c.gates, c.x))
+        self.assertEqual(bits_free_to_flip(c.gates, c.x), [])
+
+    def test_no_bit_of_a_folded_pairing_computation_is_left_free(self):
+        c = self.folded(1, materialize=True)
         self.assertTrue(c.satisfied, c.failures[:3])
         self.assertGreater(c.n_bits, 200_000)
         self.assertTrue(holds(c.gates, c.x))
@@ -353,6 +606,9 @@ class EveryCheckIsNeeded(unittest.TestCase):
         """With a wrong helper value, the stored gates evaluated on the stored
         bits, by code that shares nothing with the builder, also say no."""
         c, _ = self.miller(self.wrong("add: x", 1), materialize=True)
+        self.assertFalse(c.satisfied)
+        self.assertFalse(holds(c.gates, c.x))
+        c = self.folded(1, self.wrong("fold: choice", 0), materialize=True)
         self.assertFalse(c.satisfied)
         self.assertFalse(holds(c.gates, c.x))
 
@@ -378,10 +634,10 @@ class Groth16Verifier(unittest.TestCase):
     def test_a_real_proof_satisfies_the_verifier_gates(self):
         c = self.honest
         self.assertTrue(c.satisfied, c.failures[:3])
-        self.assertLess(c.max_products, 128)
+        self.assertEqual((c.style, c.max_products), ("wide", 3048))
         # Sizes, pinned so that changes to the encoding are noticed.
-        self.assertTrue(8_000_000 < c.n_bits < 9_000_000, c.n_bits)
-        self.assertTrue(50_000 < c.n_gates < 53_000, c.n_gates)
+        self.assertTrue(1_400_000 < c.n_bits < 1_460_000, c.n_bits)
+        self.assertTrue(9_900 < c.n_gates < 9_980, c.n_gates)
 
     def test_a_fresh_proof_of_the_same_statement_also_satisfies_them(self):
         other = self.g.prove(self.r1cs, self.trapdoor, [1, 47053, 223, 211, 223 * 223])
@@ -411,6 +667,27 @@ class Groth16Verifier(unittest.TestCase):
                 # different public input is a different statement.
                 same_statement = c.fingerprint() == self.honest.fingerprint()
                 self.assertEqual(same_statement, public == [47053])
+
+    def test_every_layout_and_final_check_agrees_and_has_its_expected_size(self):
+        from py_ecc import bn128 as bn
+        g, (A, B, C) = self.g, self.proof
+        forged = (A, B, bn.multiply(bn.G1, 12345))
+        expected = {                      # (style, fold): bits, gates, most products in a gate
+            ("wide", False): ((2_480_000, 2_550_000), (17_300, 17_400), 3048),
+            ("narrow", True): ((4_750_000, 4_850_000), (29_250, 29_450), 69),
+            ("narrow", False): ((8_450_000, 8_580_000), (51_500, 51_750), 69),
+        }
+        sizes = [self.honest.n_bits]
+        for (style, fold), (bits, gates, widest) in expected.items():
+            with self.subTest(style=style, fold=fold):
+                c = g.encode_verifier(self.vk, [47053], self.proof, style=style, fold=fold)
+                self.assertTrue(c.satisfied, c.failures[:3])
+                self.assertTrue(bits[0] < c.n_bits < bits[1], c.n_bits)
+                self.assertTrue(gates[0] < c.n_gates < gates[1], c.n_gates)
+                self.assertEqual(c.max_products, widest)
+                self.assertFalse(g.encode_verifier(self.vk, [47053], forged, style=style, fold=fold).satisfied)
+                sizes.append(c.n_bits)
+        self.assertEqual(sizes, sorted(sizes))     # each step back is larger
 
 
 if __name__ == "__main__":

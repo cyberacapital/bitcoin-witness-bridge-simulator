@@ -15,10 +15,10 @@ Three things in one repository, all meant to be read, run and attacked:
   built on witness encryption, with coin launches priced in the bridged Bitcoin.
 - **`praxis_lock/`** A reference implementation of the witness-encryption scheme
   itself, at toy parameters, with real BN254 pairings.
-- **`praxis_lock/encoding/`** A first encoding of a Groth16 proof checker in the
-  form the lock understands, so that "holds a valid proof" becomes something a
-  key can be locked to. It works on real proofs, and it is about 22 times larger
-  than the encoding the paper reports.
+- **`praxis_lock/encoding/`** An encoding of a Groth16 proof checker in the form
+  the lock understands, so that "holds a valid proof" becomes something a key can
+  be locked to. It works on real proofs. It is about 3.7 times larger than the
+  encoding the paper reports, and it has known gaps.
 
 The idea comes from *Praxis: Practical Witness Encryption for NP* (Tse, Vanjani,
 Vesely, [ePrint 2026/2971](https://eprint.iacr.org/2026/2971)): lock a Bitcoin key so
@@ -37,8 +37,8 @@ python demo.py                 # the bridge: deposit, launch a coin, trade, rede
 python demo_lock.py --fast     # the lock, on a backend that hides nothing
 pip install py_ecc
 python demo_lock.py            # the lock with real BN254 pairings (about 25 s)
-python demo_encoding.py        # a real Groth16 proof against its checker written as lock gates (about 30 s)
-python -m unittest -v          # 79 tests, about 3 minutes with py_ecc, 30 s without
+python demo_encoding.py        # a real Groth16 proof against its checker written as lock gates (about 40 s)
+python -m unittest -v          # 92 tests, about 3 minutes with py_ecc, 45 s without
 ```
 
 ## Try to break it
@@ -94,7 +94,7 @@ What it is not:
 - **Not connected to a proof system at a size it can run.** The paper locks to a
   Groth16 verifier, so any statement can be used through a proof. The verifier is
   written as lock gates in `praxis_lock/encoding/` (next section), but that
-  statement has millions of bits and this Python lock handles a few thousand.
+  statement has over a million bits and this Python lock handles a few thousand.
 - **Not hardened.** No constant-time code, no audit, slow reference pairings.
 
 ## The proof checker as a lock statement (`praxis_lock/encoding/`)
@@ -113,15 +113,21 @@ How it is built, from the bottom up:
 
 - **Numbers that do not fit.** The lock's equations work modulo one 254-bit prime;
   a proof checker computes modulo a different one. So every number is written out
-  in bits, the prover supplies the quotient of each multiplication, and the gates
-  check the result piece by piece with carries (`emulated.py`). One multiplication
-  costs 5 gates and about 600 helper bits.
+  in bits, and the prover supplies the quotient of each check (`emulated.py`).
+  There are two layouts. The *wide* one, the default, multiplies bit by bit: each
+  product in a gate is one bit of one number times a long sum over the bits of the
+  other, with every constant reduced modulo the foreign prime beforehand. That
+  keeps the quotient tiny, so a check costs 2 gates and about 35 bookkeeping bits.
+  The *narrow* one cuts numbers into three limbs and carries between them: 5 small
+  gates and about 700 bookkeeping bits per check.
 - **Bigger number systems.** The pairing lives in extensions of that field with 2
   and 12 coordinates (`fields.py`).
 - **The pairing.** The loop that evaluates a pairing is laid out step by step.
   Every division is replaced by a value the prover supplies and a multiplication
-  that checks it, and the costly last step is replaced by a root the prover
-  supplies, raised back to its power in gates (`pairing.py`).
+  that checks it. The costly last step, raising to a huge power, is replaced by a
+  root the prover supplies. By default the root is *folded* into the pairing loop,
+  where checking it costs about 40 extra multiplications. The plain form raises
+  the root back to its power in 353 steps (`pairing.py`).
 - **The checker.** A small Groth16 system for making real proofs to test with, and
   `encode_verifier`, which writes its acceptance test as gates (`groth16.py`).
 
@@ -135,49 +141,62 @@ proof = g.prove(r1cs, trapdoor, [1, 47053, 211, 223, 211 * 211])
 g.verify(vk, [47053], proof)                      # True: the ordinary checker
 g.encode_verifier(vk, [47053], proof).satisfied   # True: the same test as lock gates
 g.encode_verifier(vk, [47054], proof).satisfied   # False
+g.encode_verifier(vk, [47053], proof, style="narrow", fold=False)   # the first, largest form
 ```
 
-Measured size, for one verifying key and one public input, which are fixed into
-the gates as constants, as they are in the paper's encoding:
+Measured size on a real proof, for one verifying key and one public input, which
+are fixed into the gates as constants, as they are in the paper's encoding:
 
-| Part | Unknown bits | Gates |
-|---|---|---|
-| The proof's three points, each checked to lie on its curve | 8,408 | 46 |
-| The two pairings that involve the proof, sharing one loop | about 4.26 million | 26,097 |
-| The final check, as a root raised back to its power | about 4.24 million | 25,488 |
-| **This encoding, in total** | **about 8.51 million** | **51,631** |
-| The paper's encoding | 391,693 | 1,692 |
+| Arithmetic | Final check | Unknown bits | Gates | Most products in a gate | Times the paper |
+|---|---|---|---|---|---|
+| narrow | separate root | 8,513,569 | 51,632 | 69 | 21.7 |
+| narrow | folded into the loop | 4,803,168 | 29,347 | 69 | 12.3 |
+| wide | separate root | 2,512,718 | 17,352 | 3,048 | 6.4 |
+| **wide** | **folded into the loop** | **1,432,893** | **9,937** | **3,048** | **3.7** |
+| The paper's encoding | | 391,693 | 1,692 | at most 2,047 | 1 |
 
-No gate here holds more than 69 products. The paper's encoding goes the other way:
-each of its constraints holds at least 254 products, and its format allows up to
-2,047. The bit count here moves by a few hundred from one verifying key to another.
+The last row but one is the default. In it, 12% of the bits are bookkeeping and
+the rest are 4,972 numbers of the proof checker's field. The bit counts move by a
+few hundred from one verifying key to another.
 
 What the tests establish:
 
-- Multiplication modulo a foreign prime is exactly right on every possible
-  assignment of two miniature instances: every true product is accepted and no
-  false one is.
-- At full size, flipping any single bit of an honest multiplication is rejected.
+- Both layouts of multiplication modulo a foreign prime are exactly right on
+  every possible assignment of miniature instances: every true product is
+  accepted and no false one is.
+- At full size, no single bit of an honest multiplication can be flipped without
+  a gate noticing, in either layout.
 - Field and pairing values computed by the gates equal those of the `py_ecc`
-  library, including the full pairing loop.
-- In a shortened pairing computation, each of the 43 helper values the prover
-  supplies was replaced by a wrong one in turn, with everything after it computed
-  consistently from the wrong value. Each time, the gate meant to check that value
-  objected. None of its 220,000 bits can be flipped without a gate noticing.
-- A real Groth16 proof satisfies the full set of verifier gates. A second,
-  different proof of the same statement satisfies the same gates.
+  library, including the full pairing loop, in both layouts.
+- In a shortened pairing computation, in both layouts, each helper value the
+  prover supplies was replaced by a wrong one in turn, with everything after it
+  computed consistently from the wrong value: 48 values with the folded check, 43
+  with the separate root. Each time, the gate meant to check that value objected.
+  Written out in full in the narrow layout, none of its roughly 250,000 bits can be
+  flipped without a gate noticing.
+- The folded check rests on a few facts about numbers, which are checked. The
+  prover finds a root exactly when the pairing product is one. The check has
+  three allowed right-hand sides picked by two bits; each is accepted when it is
+  the true one, and setting both bits is refused even when the constants are
+  arranged so that the final equation would otherwise hold.
+- A real Groth16 proof satisfies the verifier gates in all four forms above. A
+  second, different proof of the same statement satisfies the same gates.
 - The gates depend only on the verifying key and the public input, never on the
   proof being checked.
 - A proof for the wrong public input, and proofs with each of their three points
   forged, do not satisfy them.
 - A small statement about BN254 numbers, written with these building blocks, locks
-  and opens through `praxis_lock` end to end.
-- Each safety check in the encoding was removed in turn to confirm some test notices.
+  and opens through `praxis_lock` end to end, in both layouts.
+- Each safety check in the encoding was removed in turn, about 80 removals in all,
+  to confirm some test notices.
 
 What it is not:
 
-- **Not the paper's encoding.** It needs about 22 times as many bits. Scaling the
-  paper's element counts, a ciphertext for it would be about 170 GiB, not 7.9.
+- **Not the paper's encoding.** It needs about 3.7 times as many bits. Scaling the
+  paper's element counts, a ciphertext for it would be about 29 GiB, not 7.9. Its
+  widest gates hold 3,048 products, above the 2,047 the paper's parameters allow,
+  so it needs about 42 million evaluation points where the paper has 3.9 million,
+  and about 2^32 non-zero coefficients where the paper reports about 2^30.
 - **Not runnable through this lock at full size.** It can be built and checked in
   a few seconds, but not encrypted to.
 - **Not proven sound, and known to be incomplete as a checker.** It does not check
@@ -189,24 +208,30 @@ What it is not:
 - **Not a proof system to use.** The Groth16 setup and prover here exist to make
   test proofs; the prover uses the setup's secret numbers.
 
-### Why it is 22 times larger
+### From 22 times the paper's size to 3.7
 
-The paper gives its encoding's size and shape, not its method, so this is read
-from its numbers. Its system has about 231 bits per constraint. A base-field
-number takes 254 bits, so there is room for at most about 1,540 base-field numbers
-in total and very little bookkeeping. This encoding stores about 8,680 base-field
-numbers, and three quarters of its bits are quotients and carries.
+The first version used the narrow layout and a separate root, and came to 22 times
+the paper's size. Two changes brought it to 3.7.
 
-| Step | Unknown bits | Times the paper |
-|---|---|---|
-| As built | about 8.51 million | 22 |
-| With wide gates, which the paper's numbers point to: each product is one bit times a long sum, with the constants reduced beforehand, so a check needs about 40 bookkeeping bits where it now needs about 700. Counted from the checks this encoding makes, not built | about 2.55 million | 6.5 |
-| And with the root check folded into the pairing loop, the method of Novakovic and Eagen's *On Proving Pairings*. An estimate | about 1.4 million | about 3.7 |
+*Wide gates.* The paper gives its encoding's size and shape but not its method.
+Its numbers show a few very wide constraints with almost no bookkeeping: about
+231 bits per constraint, where one number of the checker's field takes 254. The
+wide layout here was designed to match that shape. It is our reading of those
+numbers, not the paper's construction. It cut the bookkeeping from three quarters
+of all bits to an eighth.
 
-Wide gates have a price: up to 3,048 products in a gate, above the paper's 2,047,
-and about 2^33.6 non-zero coefficients where the paper reports about 2^30. What
-remains after both steps is a leaner way of evaluating the pairing, with fewer
-intermediate values, which the paper does not describe.
+*Folding the root.* The separate root check stored 354 values of the largest
+field, about half of everything. Folding it into the pairing loop is the method of
+Novakovic and Eagen's *On Proving Pairings*, worked out again here for these
+gates. It stores 43.
+
+What is left. The paper's bit count has room for about 1,540 numbers of the
+checker's field; this encoding stores 4,972. Three smaller steps are known and
+not built: a signed-digit pairing loop with 22 additions where it now has 36
+(about 13% fewer numbers), not storing line values for the pairing whose first
+point is fixed (about 4%), and multiplying the two lines together before the
+running product (about 4%). Past those, matching the paper needs a leaner way of
+evaluating the pairing, which the paper does not describe.
 
 ## How the bridge works
 
@@ -279,7 +304,7 @@ retired validator set could forge a burn. With it, Bitcoin's block order decides
 |---|---|---|
 | Witness-encryption lock | The bridge model uses a simulated lock: an object that releases its secret only when the rule accepts. The real scheme is in `praxis_lock/`, at toy parameters, not yet wired to the bridge | A public ciphertext of about 8 GB per key piece |
 | The vault rule | Real logic, in plain Python | The same logic compiled into a zero-knowledge circuit |
-| Proof checker as a lock statement | Built and tested on real proofs in `praxis_lock/encoding/`, at about 8.5 million bits with known gaps; not wired to the lock or the bridge | An audited encoding at the paper's size, about 0.4 million bits |
+| Proof checker as a lock statement | Built and tested on real proofs in `praxis_lock/encoding/`, at about 1.4 million bits with known gaps; not wired to the lock or the bridge | An audited encoding at the paper's size, about 0.4 million bits |
 | Bitcoin | Real proof of work, Merkle proofs and coin tracking at tiny difficulty; no fees or scripts | Bitcoin |
 | Solana | Four validators signing state roots by stake | Over a thousand validators, different signatures, and a light-client proof nobody has shipped in this form |
 | Setup-honesty proof | A direct check (`SealedShare.audit`) | A zero-knowledge proof about an 8 GB file; unsolved at this size |
@@ -375,15 +400,15 @@ praxis_lock/groups.py    exponent backend (no secrecy) and BN254 backend
 praxis_lock/scheme.py    encrypt and decrypt
 praxis_lock/reference.py the decryption sums exactly as the Lean text writes them
 praxis_lock/encoding/circuit.py   builder for gates over bits; counts, checks, fingerprints
-praxis_lock/encoding/emulated.py  arithmetic modulo a foreign prime, with quotients and carries
+praxis_lock/encoding/emulated.py  arithmetic modulo a foreign prime, in a wide and a narrow layout
 praxis_lock/encoding/fields.py    the BN254 base field and its extensions of degree 2 and 12
-praxis_lock/encoding/pairing.py   curve points, the pairing loop and the final check as gates
+praxis_lock/encoding/pairing.py   curve points, the pairing loop, and the final check folded in or separate
 praxis_lock/encoding/groth16.py   a small Groth16 system and its verifier as gates
 praxis_lock/encoding/tolock.py    hands a small gate system to the lock
 tests/test_bridge.py     25 bridge tests
 tests/test_launchpad.py  9 launch and trading tests
 tests/test_praxis_lock.py 22 lock tests
-tests/test_encoding.py   23 encoding tests
+tests/test_encoding.py   36 encoding tests
 demo.py, demo_lock.py, demo_encoding.py   narrated runs
 ```
 
@@ -405,7 +430,7 @@ demo.py, demo_lock.py, demo_encoding.py   narrated runs
 
 - The lock here runs only at toy parameters. No implementation at secure parameters
   exists, here or publicly, and the paper is unreviewed.
-- The proof checker written as a lock statement is about 22 times larger than the
+- The proof checker written as a lock statement is about 3.7 times larger than the
   paper's and has known gaps, and the lock here cannot encrypt to it.
 - The vault rule is plain Python. A real lock needs it as a zero-knowledge circuit,
   including proofs of Solana finality and of Bitcoin's history since sealing.

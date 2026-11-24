@@ -20,11 +20,12 @@ import secrets
 from dataclasses import dataclass
 
 from py_ecc import bn128 as bn
+from py_ecc import optimized_bn128 as ob
 
 from ..field import Q as R, interpolate, inv, pdivmod, peval, pmul, padd, psub, pscale
 from .circuit import Circuit
-from .pairing import (alloc_g1, alloc_g2, assert_pairing_identity, const_g2, miller_product,
-                      miller_reference)
+from .pairing import (alloc_g1, alloc_g2, assert_pairing_folded, assert_pairing_identity,
+                      const_g2, miller_product, miller_value)
 
 
 @dataclass
@@ -116,14 +117,26 @@ def public_point(vk: VerifyingKey, public):
 
 
 def verify(vk: VerifyingKey, public, proof) -> bool:
-    """The ordinary Groth16 verifier, using the library's pairing."""
+    """The ordinary Groth16 verifier, entirely on the library's own pairing code.
+
+    Checks  e(A, B) * e(-alpha, beta) * e(-L, gamma) * e(-C, delta) = 1  with
+    py_ecc's optimized implementation and one shared final exponentiation.
+    Nothing from this package's encoding is involved, so it can referee it.
+    """
     A, B, C = proof
     L = public_point(vk, public)
-    return (bn.pairing(B, A) == bn.pairing(vk.beta_g2, vk.alpha_g1)
-            * bn.pairing(vk.gamma_g2, L) * bn.pairing(vk.delta_g2, C))
+    g1 = lambda pt: (ob.FQ(int(pt[0])), ob.FQ(int(pt[1])), ob.FQ(1))
+    g2 = lambda pt: (ob.FQ2([int(v) for v in pt[0].coeffs]), ob.FQ2([int(v) for v in pt[1].coeffs]),
+                     ob.FQ2.one())
+    product = ob.FQ12.one()
+    for q, pt in ((B, A), (vk.beta_g2, bn.neg(vk.alpha_g1)), (vk.gamma_g2, bn.neg(L)),
+                  (vk.delta_g2, bn.neg(C))):
+        product = product * ob.pairing(g2(q), g1(pt), final_exponentiate=False)
+    return ob.final_exponentiate(product) == ob.FQ12.one()
 
 
-def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False) -> Circuit:
+def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
+                    style: str = "wide", fold: bool = True) -> Circuit:
     """The Groth16 verifier as gates over bits, built with `proof` as the assignment.
 
     The unknown bits are the proof's coordinates plus every intermediate value
@@ -136,18 +149,28 @@ def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False) 
         Miller(B, A) * Miller(delta, -C) * Miller(gamma, -L) / Miller(beta, alpha)
 
     is an r-th power, which is the verifier's pairing equation.
+
+    `style` is the arithmetic layout, "wide" or "narrow" (see `emulated.py`).
+    `fold` chooses how the r-th power is checked: folded into the pairing loop,
+    or as a separate root raised back to its power (see `pairing.py`). The
+    defaults give the smallest statement.
     """
     A, B, C = proof
-    c = Circuit(materialize=materialize)
+    c = Circuit(materialize=materialize, style=style)
     a_pt, b_pt, c_pt = alloc_g1(c, A), alloc_g2(c, B), alloc_g1(c, C)
     c.mark("the proof's three points, each checked to lie on its curve")
-    acc = miller_product(c, [(b_pt, a_pt), (const_g2(c, vk.delta_g2), c_pt.neg())])
-    c.mark("the two pairings that involve the proof (one shared Miller loop)")
+    pairs = [(b_pt, a_pt), (const_g2(c, vk.delta_g2), c_pt.neg())]
     L = public_point(vk, public)
-    numer = miller_reference(vk.gamma_g2, bn.neg(L))
-    denom = miller_reference(vk.beta_g2, vk.alpha_g1)
-    assert_pairing_identity(c, acc, numer, denom)
-    c.mark("the final check, done as an r-th root raised back to the r-th power")
+    numer = miller_value(vk.gamma_g2, bn.neg(L))
+    denom = miller_value(vk.beta_g2, vk.alpha_g1)
+    if fold:
+        assert_pairing_folded(c, pairs, numer, denom)
+        c.mark("the two pairings that involve the proof and the final check, in one loop")
+    else:
+        acc = miller_product(c, pairs)
+        c.mark("the two pairings that involve the proof (one shared Miller loop)")
+        assert_pairing_identity(c, acc, numer, denom)
+        c.mark("the final check, done as an r-th root raised back to the r-th power")
     return c
 
 
