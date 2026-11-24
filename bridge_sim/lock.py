@@ -7,6 +7,8 @@ zero-knowledge circuit and the key piece is witness-encrypted to it.
 `SealedShare` is a stand-in for that ciphertext. It keeps the secret inside a
 Python object and hands it out only when the statement accepts a witness. A real
 ciphertext is a public file of roughly 8 GB that nobody can open otherwise.
+It takes any rule that has a `verify(witness)` method; `timelock.py` has a
+second one.
 """
 from __future__ import annotations
 
@@ -128,7 +130,7 @@ class SealedShare:
 
     NOMINAL_SIZE_BYTES = int(7.88 * 2**30)
 
-    def __init__(self, statement: BurnStatement, secret: int, public_point: bytes):
+    def __init__(self, statement, secret: int, public_point: bytes):
         self.statement = statement
         self.public_point = public_point
         self.__secret = secret
@@ -138,7 +140,7 @@ class SealedShare:
         the public key piece? In reality this is a zero-knowledge proof."""
         return ser_point(point_mul(self.__secret)) == self.public_point
 
-    def open(self, witness: Witness) -> int:
+    def open(self, witness) -> int:
         if not self.statement.verify(witness):
             raise LockError("witness rejected: the vault stays sealed")
         return self.__secret

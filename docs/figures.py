@@ -1,4 +1,4 @@
-"""Draws the four pictures used in the README.
+"""Draws the five pictures used in the README.
 
 Run with:  python docs/figures.py        (no dependencies; writes the .svg files next to itself)
 
@@ -23,7 +23,7 @@ STATUS = {
     "TOY DEMO HERE": ("#0969DA", "#DDF0FF"),
     "TOY SIZE": ("#0969DA", "#DDF0FF"),
     "BUILT, WITH GAPS": ("#9A6700", "#FFF4D4"),
-    "ONE RULE WRITTEN": ("#9A6700", "#FFF4D4"),
+    "TWO RULES WRITTEN": ("#9A6700", "#FFF4D4"),
     "NOT CODED": ("#57606A", "#EAEEF2"),
 }
 
@@ -163,9 +163,9 @@ def overview():
 def uses():
     p = Picture(960, 668, "One lock, many uses, and which of them are coded in this repository",
                 "A secret is sealed to a rule and opens for whoever can prove the rule was met. Six uses: a bridge "
-                "without a custodian (modelled here), a reward for a solution (toy demo here), and four that are "
-                "not coded: a time lock, sending to a credential, paying on Bitcoin when a proof exists, and "
-                "spending rules on Bitcoin.")
+                "without a custodian and a time lock (both modelled here), a reward for a solution (toy demo "
+                "here), and three that are not coded: sending to a credential, paying on Bitcoin when a proof "
+                "exists, and spending rules on Bitcoin.")
     p.heading("One lock, many uses",
               "The lock opens for whoever can prove that a rule was met. Change the rule and the same lock does another job.")
 
@@ -189,12 +189,12 @@ def uses():
         ("MODELLED HERE", "Bridge without a custodian",
          ["“these tokens were burned on Solana,", "and I know the secret behind the burn”"],
          ["bridge_sim/, with a simulated lock"]),
+        ("MODELLED HERE", "Time lock",
+         ["“Bitcoin has grown 52,560 blocks", "past block X” (about a year)"],
+         ["bridge_sim/timelock.py, with a simulated lock"]),
         ("TOY DEMO HERE", "Reward for a solution",
          ["“here is a solution to this puzzle”", "(in the demo: two factors of 47,053)"],
          ["demo_lock.py, with the real lock at toy size"]),
-        ("NOT CODED", "Time lock",
-         ["“Bitcoin has grown 52,560 blocks", "past block X” (about a year)"],
-         ["the block checks exist in bridge_sim/"]),
         ("NOT CODED", "Sending to a credential",
          ["“I hold a certificate from this registry", "that says: licensed doctor”"],
          ["needs a rule that checks a signature"]),
@@ -223,7 +223,8 @@ def uses():
 
 def pipeline():
     p = Picture(960, 644, "From a rule to a lock: the five stages and what this repository has of each",
-                "Stage 1, the rule as a program: only the bridge rule is written, in plain Python. Stage 2, a proof "
+                "Stage 1, the rule as a program: two rules are written, in plain Python: the bridge's and a small "
+                "time lock. Stage 2, a proof "
                 "that the program said yes: not coded. Stage 3, one small Groth16 proof: a toy system that makes "
                 "real test proofs. Stage 4, the proof checker as lock gates: built, with gaps, 1.4 times the size "
                 "the paper reports. Stage 5, the lock: built at toy size.")
@@ -233,7 +234,7 @@ def pipeline():
     p.text(500, 116, "IN THIS REPOSITORY", size=11, weight=700, fill=MUTED, spacing="0.8")
     stages = [
         ("The rule", ["A program that looks at evidence", "and answers yes or no."],
-         "ONE RULE WRITTEN", ["The bridge's rule, in plain Python", "(bridge_sim/lock.py). No other rule yet."]),
+         "TWO RULES WRITTEN", ["The bridge's rule and a small time lock,", "in plain Python (bridge_sim/)."]),
         ("Proof of the run", ["A zero-knowledge machine proves that", "the program said yes."],
          "NOT CODED", ["The paper uses an existing machine.", "A rule would be rewritten for it."]),
         ("One small proof", ["That proof is wrapped into a single", "Groth16 proof of fixed size."],
@@ -271,7 +272,7 @@ def examples():
     p.heading("Three other locks, step by step",
               "Each follows the bridge's pattern: seal a secret to a rule, wait until the rule can be proven, open.")
     rows = [
-        ("Time lock", "NOT CODED",
+        ("Time lock", "MODELLED HERE",
          ["Anyone seals a message to: “Bitcoin", "has grown 52,560 blocks past block X.”"],
          ["About a year of blocks is mined.", "Nobody has to do anything."],
          ["Anyone shows the block headers", "and reads the message."]),
@@ -300,7 +301,39 @@ def examples():
     p.save("examples.svg")
 
 
+# ---------------------------------------------------------------- 5. what every use has to live with
+
+def limits():
+    p = Picture(960, 446, "Limits that every use of the lock shares",
+                "Six limits. The rule is fixed when the lock is made. Whoever has a proof opens it, once and for "
+                "all. Evidence can be forged at a price. Each sealed key piece is about 8 GB of public data in the "
+                "paper and about 11 GB with this repository's encoding. One setup stands behind every lock. It is "
+                "not safe against quantum computers and has not been reviewed.")
+    p.heading("What every use has to live with",
+              "These come from how the lock works, so they hold for the bridge and for every other rule.")
+    amber, soft = STATUS["BUILT, WITH GAPS"]
+    cards = [
+        ("The rule is fixed",
+         ["It is set when the lock is made and", "cannot be changed or withdrawn.", "It sees only what a proof shows it."]),
+        ("Whoever has a proof opens",
+         ["The lock does not know who anyone", "is. Public evidence means a public", "secret. Opening is once and for all."]),
+        ("Evidence can be forged",
+         ["At a price. A time lock is as strong", "as the cost of mining its blocks in", "secret; a signature rule, as its keys."]),
+        ("Large and heavy",
+         ["About 8 GB of public data for each", "sealed key piece in the paper, about", "11 GB here. Heavy to make and open."]),
+        ("One setup for every lock",
+         ["Whoever ran the proof system's setup", "and kept its secret numbers can open", "every lock made for that key."]),
+        ("New and unreviewed",
+         ["The paper is from 2026 and has not", "been reviewed. The scheme is not", "safe against quantum computers."]),
+    ]
+    for i, (title, rows) in enumerate(cards):
+        step(p, 40 + 300 * (i % 3), 104 + 140 * (i // 3), str(i + 1), title, rows, amber, soft, w=280, h=122)
+    p.footnote(406, "On top of these, this repository has no security at all:",
+               "the lock in bridge_sim/ is simulated and praxis_lock/ runs at toy size.")
+    p.save("limits.svg")
+
+
 if __name__ == "__main__":
-    for draw in (overview, uses, pipeline, examples):
+    for draw in (overview, uses, pipeline, examples, limits):
         draw()
     print("wrote", ", ".join(sorted(f.name for f in HERE.glob("*.svg"))))

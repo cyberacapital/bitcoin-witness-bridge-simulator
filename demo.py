@@ -1,5 +1,5 @@
 """A narrated run of the bridge model. Run with:  python demo.py"""
-from bridge_sim import COIN, Key, LaunchError, LockError, TxOut, World, open_vault
+from bridge_sim import COIN, Key, LaunchError, LockError, TxOut, World, open_vault, time_lock
 
 
 def btc(sats: int) -> str:
@@ -68,6 +68,19 @@ def main() -> None:
     print(f"\nRule check: tokens in circulation = {btc(w.bridge.supply)}, matching the Bitcoin left in vaults.")
     print(f"            Of that, {in_pool / COIN:.4f} BTC sits in the MOON pool, still backed one-for-one.")
     print(f"Mallory ends with {btc(w.btc.balance(mallory.pub))}.")
+
+    # The lock does not care what its rule is. A second rule: a time lock.
+    note, start = Key.generate(), w.btc.tip
+    lock = time_lock(start.hash, 3, note)
+    print("\nSAME LOCK, ANOTHER RULE  A secret is locked to 'Bitcoin has grown three more blocks'.")
+    try:
+        lock.open(w.btc.headers[start.height + 1:])
+        print("            It opened at once. This should never print.")
+    except LockError:
+        print("            Now: refused.")
+    w.btc.mine(3)
+    assert lock.open(w.btc.headers[start.height + 1:]) == note.k
+    print("            Three blocks later: it opens for anyone who shows the blocks.")
 
 
 if __name__ == "__main__":

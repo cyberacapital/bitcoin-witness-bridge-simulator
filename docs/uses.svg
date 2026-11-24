@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 668" width="960" height="668" role="img" aria-labelledby="t d" font-family="Helvetica, Arial, 'Liberation Sans', sans-serif">
 <title id="t">One lock, many uses, and which of them are coded in this repository</title>
-<desc id="d">A secret is sealed to a rule and opens for whoever can prove the rule was met. Six uses: a bridge without a custodian (modelled here), a reward for a solution (toy demo here), and four that are not coded: a time lock, sending to a credential, paying on Bitcoin when a proof exists, and spending rules on Bitcoin.</desc>
+<desc id="d">A secret is sealed to a rule and opens for whoever can prove the rule was met. Six uses: a bridge without a custodian and a time lock (both modelled here), a reward for a solution (toy demo here), and three that are not coded: sending to a credential, paying on Bitcoin when a proof exists, and spending rules on Bitcoin.</desc>
 <defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#57606A"/></marker></defs>
 <rect x="0.5" y="0.5" width="959" height="667" rx="14" fill="#FCFBF8" stroke="#E5E1D8"/>
 <text x="40" y="52" font-size="24" fill="#1F2328" font-weight="700">One lock, many uses</text>
@@ -32,23 +32,23 @@
 <line x1="56" y1="378" x2="304" y2="378" stroke="#E5E1D8"/>
 <text x="56" y="397.0" font-size="11.5" fill="#57606A">bridge_sim/, with a simulated lock</text>
 <rect x="340" y="252" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
-<rect x="356" y="267" width="123" height="19" rx="9.5" fill="#DDF0FF"/>
-<text x="364" y="281" font-size="11" fill="#0969DA" font-weight="700" letter-spacing="0.8">TOY DEMO HERE</text>
-<text x="356" y="310" font-size="15.5" fill="#1F2328" font-weight="700">Reward for a solution</text>
+<rect x="356" y="267" width="123" height="19" rx="9.5" fill="#DDF4E4"/>
+<text x="364" y="281" font-size="11" fill="#1A7F37" font-weight="700" letter-spacing="0.8">MODELLED HERE</text>
+<text x="356" y="310" font-size="15.5" fill="#1F2328" font-weight="700">Time lock</text>
 <text x="356" y="332" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
-<text x="356" y="351" font-size="12.5" fill="#1F2328" font-style="italic">“here is a solution to this puzzle”</text>
-<text x="356" y="368" font-size="12.5" fill="#1F2328" font-style="italic">(in the demo: two factors of 47,053)</text>
+<text x="356" y="351" font-size="12.5" fill="#1F2328" font-style="italic">“Bitcoin has grown 52,560 blocks</text>
+<text x="356" y="368" font-size="12.5" fill="#1F2328" font-style="italic">past block X” (about a year)</text>
 <line x1="356" y1="378" x2="604" y2="378" stroke="#E5E1D8"/>
-<text x="356" y="397.0" font-size="11.5" fill="#57606A">demo_lock.py, with the real lock at toy size</text>
+<text x="356" y="397.0" font-size="11.5" fill="#57606A">bridge_sim/timelock.py, with a simulated lock</text>
 <rect x="640" y="252" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
-<rect x="656" y="267" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
-<text x="664" y="281" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
-<text x="656" y="310" font-size="15.5" fill="#1F2328" font-weight="700">Time lock</text>
+<rect x="656" y="267" width="123" height="19" rx="9.5" fill="#DDF0FF"/>
+<text x="664" y="281" font-size="11" fill="#0969DA" font-weight="700" letter-spacing="0.8">TOY DEMO HERE</text>
+<text x="656" y="310" font-size="15.5" fill="#1F2328" font-weight="700">Reward for a solution</text>
 <text x="656" y="332" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
-<text x="656" y="351" font-size="12.5" fill="#1F2328" font-style="italic">“Bitcoin has grown 52,560 blocks</text>
-<text x="656" y="368" font-size="12.5" fill="#1F2328" font-style="italic">past block X” (about a year)</text>
+<text x="656" y="351" font-size="12.5" fill="#1F2328" font-style="italic">“here is a solution to this puzzle”</text>
+<text x="656" y="368" font-size="12.5" fill="#1F2328" font-style="italic">(in the demo: two factors of 47,053)</text>
 <line x1="656" y1="378" x2="904" y2="378" stroke="#E5E1D8"/>
-<text x="656" y="397.0" font-size="11.5" fill="#57606A">the block checks exist in bridge_sim/</text>
+<text x="656" y="397.0" font-size="11.5" fill="#57606A">demo_lock.py, with the real lock at toy size</text>
 <rect x="40" y="428" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
 <rect x="56" y="443" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
 <text x="64" y="457" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>

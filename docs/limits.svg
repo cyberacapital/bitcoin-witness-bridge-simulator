@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 446" width="960" height="446" role="img" aria-labelledby="t d" font-family="Helvetica, Arial, 'Liberation Sans', sans-serif">
+<title id="t">Limits that every use of the lock shares</title>
+<desc id="d">Six limits. The rule is fixed when the lock is made. Whoever has a proof opens it, once and for all. Evidence can be forged at a price. Each sealed key piece is about 8 GB of public data in the paper and about 11 GB with this repository's encoding. One setup stands behind every lock. It is not safe against quantum computers and has not been reviewed.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#57606A"/></marker></defs>
+<rect x="0.5" y="0.5" width="959" height="445" rx="14" fill="#FCFBF8" stroke="#E5E1D8"/>
+<text x="40" y="52" font-size="24" fill="#1F2328" font-weight="700">What every use has to live with</text>
+<text x="40" y="78" font-size="14" fill="#57606A">These come from how the lock works, so they hold for the bridge and for every other rule.</text>
+<rect x="40" y="104" width="280" height="122" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="40" y="104" width="5" height="122" rx="2.5" fill="#9A6700"/>
+<rect x="56" y="117" width="22" height="22" rx="11" fill="#FFF4D4"/>
+<text x="67.0" y="132.5" font-size="12.5" fill="#9A6700" font-weight="700" text-anchor="middle">1</text>
+<text x="87" y="133.5" font-size="15.5" fill="#1F2328" font-weight="700">The rule is fixed</text>
+<text x="56" y="162.0" font-size="12.5" fill="#1F2328">It is set when the lock is made and</text>
+<text x="56" y="179.5" font-size="12.5" fill="#1F2328">cannot be changed or withdrawn.</text>
+<text x="56" y="197.0" font-size="12.5" fill="#1F2328">It sees only what a proof shows it.</text>
+<rect x="340" y="104" width="280" height="122" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="340" y="104" width="5" height="122" rx="2.5" fill="#9A6700"/>
+<rect x="356" y="117" width="22" height="22" rx="11" fill="#FFF4D4"/>
+<text x="367.0" y="132.5" font-size="12.5" fill="#9A6700" font-weight="700" text-anchor="middle">2</text>
+<text x="387" y="133.5" font-size="15.5" fill="#1F2328" font-weight="700">Whoever has a proof opens</text>
+<text x="356" y="162.0" font-size="12.5" fill="#1F2328">The lock does not know who anyone</text>
+<text x="356" y="179.5" font-size="12.5" fill="#1F2328">is. Public evidence means a public</text>
+<text x="356" y="197.0" font-size="12.5" fill="#1F2328">secret. Opening is once and for all.</text>
+<rect x="640" y="104" width="280" height="122" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="640" y="104" width="5" height="122" rx="2.5" fill="#9A6700"/>
+<rect x="656" y="117" width="22" height="22" rx="11" fill="#FFF4D4"/>
+<text x="667.0" y="132.5" font-size="12.5" fill="#9A6700" font-weight="700" text-anchor="middle">3</text>
+<text x="687" y="133.5" font-size="15.5" fill="#1F2328" font-weight="700">Evidence can be forged</text>
+<text x="656" y="162.0" font-size="12.5" fill="#1F2328">At a price. A time lock is as strong</text>
+<text x="656" y="179.5" font-size="12.5" fill="#1F2328">as the cost of mining its blocks in</text>
+<text x="656" y="197.0" font-size="12.5" fill="#1F2328">secret; a signature rule, as its keys.</text>
+<rect x="40" y="244" width="280" height="122" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="40" y="244" width="5" height="122" rx="2.5" fill="#9A6700"/>
+<rect x="56" y="257" width="22" height="22" rx="11" fill="#FFF4D4"/>
+<text x="67.0" y="272.5" font-size="12.5" fill="#9A6700" font-weight="700" text-anchor="middle">4</text>
+<text x="87" y="273.5" font-size="15.5" fill="#1F2328" font-weight="700">Large and heavy</text>
+<text x="56" y="302.0" font-size="12.5" fill="#1F2328">About 8 GB of public data for each</text>
+<text x="56" y="319.5" font-size="12.5" fill="#1F2328">sealed key piece in the paper, about</text>
+<text x="56" y="337.0" font-size="12.5" fill="#1F2328">11 GB here. Heavy to make and open.</text>
+<rect x="340" y="244" width="280" height="122" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="340" y="244" width="5" height="122" rx="2.5" fill="#9A6700"/>
+<rect x="356" y="257" width="22" height="22" rx="11" fill="#FFF4D4"/>
+<text x="367.0" y="272.5" font-size="12.5" fill="#9A6700" font-weight="700" text-anchor="middle">5</text>
+<text x="387" y="273.5" font-size="15.5" fill="#1F2328" font-weight="700">One setup for every lock</text>
+<text x="356" y="302.0" font-size="12.5" fill="#1F2328">Whoever ran the proof system's setup</text>
+<text x="356" y="319.5" font-size="12.5" fill="#1F2328">and kept its secret numbers can open</text>
+<text x="356" y="337.0" font-size="12.5" fill="#1F2328">every lock made for that key.</text>
+<rect x="640" y="244" width="280" height="122" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="640" y="244" width="5" height="122" rx="2.5" fill="#9A6700"/>
+<rect x="656" y="257" width="22" height="22" rx="11" fill="#FFF4D4"/>
+<text x="667.0" y="272.5" font-size="12.5" fill="#9A6700" font-weight="700" text-anchor="middle">6</text>
+<text x="687" y="273.5" font-size="15.5" fill="#1F2328" font-weight="700">New and unreviewed</text>
+<text x="656" y="302.0" font-size="12.5" fill="#1F2328">The paper is from 2026 and has not</text>
+<text x="656" y="319.5" font-size="12.5" fill="#1F2328">been reviewed. The scheme is not</text>
+<text x="656" y="337.0" font-size="12.5" fill="#1F2328">safe against quantum computers.</text>
+<circle cx="46" cy="401.5" r="4.5" fill="#B35900"/>
+<text x="58" y="406" font-size="12.5" fill="#1F2328"><tspan font-weight="700">On top of these, this repository has no security at all:</tspan> the lock in bridge_sim/ is simulated and praxis_lock/ runs at toy size.</text>
+</svg>

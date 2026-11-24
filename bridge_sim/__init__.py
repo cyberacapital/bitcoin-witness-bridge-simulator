@@ -7,6 +7,7 @@ from .launchpad import FEE_BPS, Launchpad, LaunchError, Pool
 from .lock import BurnStatement, LockError, RedemptionRecord, SealedShare, Witness, commitment_for
 from .scenario import World
 from .setup import SealedVault, open_vault, seal_vault
+from .timelock import HeightStatement, time_lock
 from .solana import (
     ROOT_TAG,
     FinalizedRoot,
