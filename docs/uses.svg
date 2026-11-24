@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 668" width="960" height="668" role="img" aria-labelledby="t d" font-family="Helvetica, Arial, 'Liberation Sans', sans-serif">
+<title id="t">One lock, many uses, and which of them are coded in this repository</title>
+<desc id="d">A secret is sealed to a rule and opens for whoever can prove the rule was met. Six uses: a bridge without a custodian (modelled here), a reward for a solution (toy demo here), and four that are not coded: a time lock, sending to a credential, paying on Bitcoin when a proof exists, and spending rules on Bitcoin.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#57606A"/></marker></defs>
+<rect x="0.5" y="0.5" width="959" height="667" rx="14" fill="#FCFBF8" stroke="#E5E1D8"/>
+<text x="40" y="52" font-size="24" fill="#1F2328" font-weight="700">One lock, many uses</text>
+<text x="40" y="78" font-size="14" fill="#57606A">The lock opens for whoever can prove that a rule was met. Change the rule and the same lock does another job.</text>
+<rect x="40" y="104" width="250" height="92" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="60" y="134" font-size="15.5" fill="#1F2328" font-weight="700">A secret</text>
+<text x="60" y="157.0" font-size="12.5" fill="#57606A">a key, a file, a message</text>
+<rect x="355" y="104" width="250" height="92" rx="10" fill="#F6F8FA" stroke="#57606A" stroke-dasharray="5 4"/>
+<path d="M384 141 v-9 a13 13 0 0 1 26 0 v9" fill="none" stroke="#1F2328" stroke-width="5" stroke-linecap="round"/>
+<rect x="376" y="141" width="42" height="32" rx="6" fill="#1F2328"/>
+<circle cx="397" cy="154" r="4.2" fill="#F6F8FA"/><rect x="395.4" y="155" width="3.2" height="9" rx="1.6" fill="#F6F8FA"/>
+<text x="432" y="134" font-size="15.5" fill="#1F2328" font-weight="700">sealed to a rule</text>
+<text x="432" y="157.0" font-size="12.5" fill="#57606A" font-style="italic">“someone can prove</text>
+<text x="432" y="174.5" font-size="12.5" fill="#57606A" font-style="italic">that ...”</text>
+<rect x="670" y="104" width="250" height="92" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="690" y="134" font-size="15.5" fill="#1F2328" font-weight="700">opens for any prover</text>
+<text x="690" y="157.0" font-size="12.5" fill="#57606A">no operator and no judge,</text>
+<text x="690" y="174.5" font-size="12.5" fill="#57606A">even if the sealer is gone</text>
+<line x1="293" y1="150.0" x2="351" y2="150.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="608" y1="150.0" x2="666" y2="150.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="40" y="236" font-size="15.5" fill="#1F2328" font-weight="700">The same lock, with six different rules</text>
+<rect x="40" y="252" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="56" y="267" width="123" height="19" rx="9.5" fill="#DDF4E4"/>
+<text x="64" y="281" font-size="11" fill="#1A7F37" font-weight="700" letter-spacing="0.8">MODELLED HERE</text>
+<text x="56" y="310" font-size="15.5" fill="#1F2328" font-weight="700">Bridge without a custodian</text>
+<text x="56" y="332" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
+<text x="56" y="351" font-size="12.5" fill="#1F2328" font-style="italic">“these tokens were burned on Solana,</text>
+<text x="56" y="368" font-size="12.5" fill="#1F2328" font-style="italic">and I know the secret behind the burn”</text>
+<line x1="56" y1="378" x2="304" y2="378" stroke="#E5E1D8"/>
+<text x="56" y="397.0" font-size="11.5" fill="#57606A">bridge_sim/, with a simulated lock</text>
+<rect x="340" y="252" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="356" y="267" width="123" height="19" rx="9.5" fill="#DDF0FF"/>
+<text x="364" y="281" font-size="11" fill="#0969DA" font-weight="700" letter-spacing="0.8">TOY DEMO HERE</text>
+<text x="356" y="310" font-size="15.5" fill="#1F2328" font-weight="700">Reward for a solution</text>
+<text x="356" y="332" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
+<text x="356" y="351" font-size="12.5" fill="#1F2328" font-style="italic">“here is a solution to this puzzle”</text>
+<text x="356" y="368" font-size="12.5" fill="#1F2328" font-style="italic">(in the demo: two factors of 47,053)</text>
+<line x1="356" y1="378" x2="604" y2="378" stroke="#E5E1D8"/>
+<text x="356" y="397.0" font-size="11.5" fill="#57606A">demo_lock.py, with the real lock at toy size</text>
+<rect x="640" y="252" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="656" y="267" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
+<text x="664" y="281" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
+<text x="656" y="310" font-size="15.5" fill="#1F2328" font-weight="700">Time lock</text>
+<text x="656" y="332" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
+<text x="656" y="351" font-size="12.5" fill="#1F2328" font-style="italic">“Bitcoin has grown 52,560 blocks</text>
+<text x="656" y="368" font-size="12.5" fill="#1F2328" font-style="italic">past block X” (about a year)</text>
+<line x1="656" y1="378" x2="904" y2="378" stroke="#E5E1D8"/>
+<text x="656" y="397.0" font-size="11.5" fill="#57606A">the block checks exist in bridge_sim/</text>
+<rect x="40" y="428" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="56" y="443" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
+<text x="64" y="457" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
+<text x="56" y="486" font-size="15.5" fill="#1F2328" font-weight="700">Sending to a credential</text>
+<text x="56" y="508" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
+<text x="56" y="527" font-size="12.5" fill="#1F2328" font-style="italic">“I hold a certificate from this registry</text>
+<text x="56" y="544" font-size="12.5" fill="#1F2328" font-style="italic">that says: licensed doctor”</text>
+<line x1="56" y1="554" x2="304" y2="554" stroke="#E5E1D8"/>
+<text x="56" y="573.0" font-size="11.5" fill="#57606A">needs a rule that checks a signature</text>
+<rect x="340" y="428" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="356" y="443" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
+<text x="364" y="457" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
+<text x="356" y="486" font-size="15.5" fill="#1F2328" font-weight="700">Paying on Bitcoin for a proof</text>
+<text x="356" y="508" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
+<text x="356" y="527" font-size="12.5" fill="#1F2328" font-style="italic">“this program ran on this input</text>
+<text x="356" y="544" font-size="12.5" fill="#1F2328" font-style="italic">and gave this result”</text>
+<line x1="356" y1="554" x2="604" y2="554" stroke="#E5E1D8"/>
+<text x="356" y="573.0" font-size="11.5" fill="#57606A">the proof checker is the building block</text>
+<rect x="640" y="428" width="280" height="160" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<rect x="656" y="443" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
+<text x="664" y="457" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
+<text x="656" y="486" font-size="15.5" fill="#1F2328" font-weight="700">Spending rules on Bitcoin</text>
+<text x="656" y="508" font-size="11.5" fill="#57606A">Opens for whoever can prove:</text>
+<text x="656" y="527" font-size="12.5" fill="#1F2328" font-style="italic">“this spend follows the rule</text>
+<text x="656" y="544" font-size="12.5" fill="#1F2328" font-style="italic">the coins were sealed under”</text>
+<line x1="656" y1="554" x2="904" y2="554" stroke="#E5E1D8"/>
+<text x="656" y="573.0" font-size="11.5" fill="#57606A">called covenants; needs extra design</text>
+<circle cx="46" cy="639.5" r="4.5" fill="#B35900"/>
+<text x="58" y="644" font-size="12.5" fill="#1F2328"><tspan font-weight="700">Only the rule changes.</tspan> The lock and the proof checker are the same for every use. None of it runs at real size here.</text>
+</svg>

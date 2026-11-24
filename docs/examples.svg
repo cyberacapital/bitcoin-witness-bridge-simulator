@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 572" width="960" height="572" role="img" aria-labelledby="t d" font-family="Helvetica, Arial, 'Liberation Sans', sans-serif">
+<title id="t">Three other locks, step by step: a time lock, a reward for a solution, sending to a credential</title>
+<desc id="d">Each follows the bridge's pattern: seal a secret to a rule, wait until the rule can be proven, open. Time lock: sealed to Bitcoin growing by a number of blocks; anyone opens it by showing the block headers. Reward: sealed to a solution of a puzzle; the solver opens it. Credential: sealed to holding a certificate; any holder opens it.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#57606A"/></marker></defs>
+<rect x="0.5" y="0.5" width="959" height="571" rx="14" fill="#FCFBF8" stroke="#E5E1D8"/>
+<text x="40" y="52" font-size="24" fill="#1F2328" font-weight="700">Three other locks, step by step</text>
+<text x="40" y="78" font-size="14" fill="#57606A">Each follows the bridge's pattern: seal a secret to a rule, wait until the rule can be proven, open.</text>
+<text x="40" y="124" font-size="15.5" fill="#1F2328" font-weight="700">Time lock</text>
+<rect x="132" y="110" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
+<text x="140" y="124" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
+<rect x="40" y="138" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="56" y="160" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">SEAL</text>
+<text x="56" y="183" font-size="12.5" fill="#1F2328">Anyone seals a message to: “Bitcoin</text>
+<text x="56" y="201" font-size="12.5" fill="#1F2328">has grown 52,560 blocks past block X.”</text>
+<rect x="340" y="138" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="356" y="160" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">THEN</text>
+<text x="356" y="183" font-size="12.5" fill="#1F2328">About a year of blocks is mined.</text>
+<text x="356" y="201" font-size="12.5" fill="#1F2328">Nobody has to do anything.</text>
+<line x1="323" y1="182.0" x2="336" y2="182.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="640" y="138" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="656" y="160" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">OPEN</text>
+<text x="656" y="183" font-size="12.5" fill="#1F2328">Anyone shows the block headers</text>
+<text x="656" y="201" font-size="12.5" fill="#1F2328">and reads the message.</text>
+<line x1="623" y1="182.0" x2="636" y2="182.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="40" y="262" font-size="15.5" fill="#1F2328" font-weight="700">Reward for a solution</text>
+<rect x="237" y="248" width="123" height="19" rx="9.5" fill="#DDF0FF"/>
+<text x="245" y="262" font-size="11" fill="#0969DA" font-weight="700" letter-spacing="0.8">TOY DEMO HERE</text>
+<rect x="40" y="276" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="56" y="298" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">SEAL</text>
+<text x="56" y="321" font-size="12.5" fill="#1F2328">A sponsor seals the key to a reward</text>
+<text x="56" y="339" font-size="12.5" fill="#1F2328">to: “here is a solution to this puzzle.”</text>
+<rect x="340" y="276" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="356" y="298" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">THEN</text>
+<text x="356" y="321" font-size="12.5" fill="#1F2328">Someone finds a solution.</text>
+<text x="356" y="339" font-size="12.5" fill="#1F2328">The sponsor can be long gone.</text>
+<line x1="323" y1="320.0" x2="336" y2="320.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="640" y="276" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="656" y="298" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">OPEN</text>
+<text x="656" y="321" font-size="12.5" fill="#1F2328">The solver opens the lock and takes</text>
+<text x="656" y="339" font-size="12.5" fill="#1F2328">the reward. No judge decides.</text>
+<line x1="623" y1="320.0" x2="636" y2="320.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="40" y="400" font-size="15.5" fill="#1F2328" font-weight="700">Sending to a credential</text>
+<rect x="254" y="386" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
+<text x="262" y="400" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
+<rect x="40" y="414" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="56" y="436" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">SEAL</text>
+<text x="56" y="459" font-size="12.5" fill="#1F2328">A sender seals a file to: “I hold this</text>
+<text x="56" y="477" font-size="12.5" fill="#1F2328">registry's certificate for a doctor.”</text>
+<rect x="340" y="414" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="356" y="436" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">THEN</text>
+<text x="356" y="459" font-size="12.5" fill="#1F2328">A doctor holds such a certificate,</text>
+<text x="356" y="477" font-size="12.5" fill="#1F2328">or is issued one later.</text>
+<line x1="323" y1="458.0" x2="336" y2="458.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="640" y="414" width="280" height="88" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
+<text x="656" y="436" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">OPEN</text>
+<text x="656" y="459" font-size="12.5" fill="#1F2328">Any holder opens it. The sender</text>
+<text x="656" y="477" font-size="12.5" fill="#1F2328">never learns who did.</text>
+<line x1="623" y1="458.0" x2="636" y2="458.0" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
+<circle cx="46" cy="541.5" r="4.5" fill="#B35900"/>
+<text x="58" y="546" font-size="12.5" fill="#1F2328"><tspan font-weight="700">Limits shared by all of them:</tspan> the rule is fixed when the lock is made, and whoever holds a proof can open.</text>
+</svg>
