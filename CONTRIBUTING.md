@@ -22,7 +22,7 @@ show the assumption is weaker or more expensive than the README says.
 - Find a statement, parameter set or coin choice where a true solution fails to
   decrypt. The Lean proof says that happens with probability at most 2/q.
 - Find a way to decrypt on the BN254 backend without a solution that is cheaper
-  than trying every answer. At toy sizes this says little about the scheme, but it
+  than trying every answer. On examples this small that says little about the scheme, but it
   would expose a transcription error.
 
 ## Check the encoding

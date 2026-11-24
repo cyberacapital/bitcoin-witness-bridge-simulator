@@ -56,5 +56,5 @@
 <rect x="40" y="312" width="880" height="60" fill="#F3F2F1"/>
 <rect x="40" y="312" width="6" height="60" fill="#505A5F"/>
 <text x="62" y="339" font-size="15" fill="#0B0C0C" font-weight="700">On top of these, this repository has no security at all</text>
-<text x="62" y="359" font-size="12.5" fill="#505A5F">The lock in bridge_sim/ is simulated and praxis_lock/ runs at toy size.</text>
+<text x="62" y="359" font-size="12.5" fill="#505A5F">The lock in bridge_sim/ is simulated and praxis_lock/ only handles tiny examples.</text>
 </svg>

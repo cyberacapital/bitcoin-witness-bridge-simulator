@@ -25,8 +25,8 @@ THIRDS = [40, 340, 640]                 # three columns of 280
 # How far along a part is in this repository: (words colour, fill, border, bar of its card).
 STATUS = {
     "MODELLED HERE": (PAPER, RED, RED, RED),
-    "TOY DEMO HERE": (RED, PAPER, RED, RED),
-    "TOY SIZE": (RED, PAPER, RED, RED),
+    "TINY DEMO HERE": (RED, PAPER, RED, RED),
+    "TINY EXAMPLES ONLY": (RED, PAPER, RED, RED),
     "TWO RULES WRITTEN": (RED, PAPER, RED, RED),
     "BUILT, WITH GAPS": (RED, PAPER, RED, RED),
     "NOT CODED": (PAPER, GREY, GREY, GREY),
@@ -160,7 +160,7 @@ def solves():
 def use_cases():
     p = Picture(516, "Use cases",
                 "Two groups. Money on Bitcoin: borrowing against Bitcoin, moving Bitcoin to other networks (modelled "
-                "here), self-custody safes, prizes that pay themselves (toy demo here). Alarms and information: "
+                "here), self-custody safes, prizes that pay themselves (tiny demo here). Alarms and information: "
                 "tripwire alarms, time capsules (modelled here), an inheritance switch, credential-locked files. "
                 "The paper is new and unreviewed and needs an honest one-time setup.")
     p.band(200, 20, 560, "Use cases", h=44, centred=True)
@@ -177,7 +177,7 @@ def use_cases():
                  ("Inheritance switch", "Releases keys after missed check-ins"),
                  ("Credential-locked files", "Readable only with proof of ID")],
                 tags={"Move Bitcoin to other networks": "MODELLED HERE", "Time capsules": "MODELLED HERE",
-                      "Prizes that pay themselves": "TOY DEMO HERE"})
+                      "Prizes that pay themselves": "TINY DEMO HERE"})
     p.strip(436, "Not yet proven", "New and unreviewed; needs an honest one-time setup")
     p.save("use-cases.svg")
 
@@ -209,7 +209,7 @@ def overview():
     p = Picture(656, "A Bitcoin to Solana bridge with no operator",
                 "Bitcoin is sent to a vault whose key is sealed in a lock. Solana mints the same amount as tokens. "
                 "Tokens are used to launch and trade coins. Burning tokens gives a proof that opens the lock and "
-                "releases the Bitcoin. The repository holds a model of the bridge, the lock scheme at toy size, "
+                "releases the Bitcoin. The repository holds a model of the bridge, the lock scheme working on tiny examples, "
                 "and a proof checker written for the lock.")
     p.band(LEFT, 20, FULL, "A Bitcoin to Solana bridge with no operator", h=44)
     cols, top, low, w, h = [40, 267, 493, 720], 118, 300, 200, 112
@@ -239,7 +239,7 @@ def overview():
 
     p.band(LEFT, 436, FULL, "What is in the repository", fill=DARK, h=36)
     tiles = [("bridge_sim/", ["The whole bridge as a runnable model,", "attacks included. Its lock is simulated."]),
-             ("praxis_lock/", ["The lock scheme itself, from the Praxis", "paper, at toy size with real pairings."]),
+             ("praxis_lock/", ["The lock scheme itself, from the Praxis", "paper, working on tiny examples only."]),
              ("praxis_lock/encoding/", ["A proof checker rewritten for the lock.", "Runs on real proofs, 1.4× the paper's size."])]
     for x, (name, rows) in zip(THIRDS, tiles):
         p.tile(x, 482, 280, 84, name, rows, mono=True)
@@ -252,7 +252,7 @@ def overview():
 def uses():
     p = Picture(634, "One lock, many uses",
                 "A secret is sealed to a rule and opens for whoever can prove the rule was met. Six uses: a bridge "
-                "without a custodian and a time lock (both modelled here), a reward for a solution (toy demo "
+                "without a custodian and a time lock (both modelled here), a reward for a solution (tiny demo "
                 "here), and three that are not coded: sending to a credential, paying on Bitcoin when a proof "
                 "exists, and spending rules on Bitcoin.")
     p.band(200, 20, 560, "One lock, many uses", h=44, centred=True)
@@ -271,9 +271,9 @@ def uses():
         ("MODELLED HERE", "Time lock",
          ["“Bitcoin has grown 52,560 blocks", "past block X” (about a year)"],
          "bridge_sim/timelock.py, with a simulated lock"),
-        ("TOY DEMO HERE", "Reward for a solution",
+        ("TINY DEMO HERE", "Reward for a solution",
          ["“here is a solution to this puzzle”", "(in the demo: two factors of 47,053)"],
-         "demo_lock.py, with the real lock at toy size"),
+         "demo_lock.py, the real lock on a tiny example"),
         ("NOT CODED", "Sending to a credential",
          ["“I hold a certificate from this registry", "that says: licensed doctor”"],
          "needs a rule that checks a signature"),
@@ -301,9 +301,9 @@ def pipeline():
     p = Picture(660, "From a rule to a lock: what is built here",
                 "Every use goes through the same five stages. Stage 1, the rule as a program: two rules are written "
                 "in plain Python, the bridge's and a small time lock. Stage 2, a proof that the program said yes: "
-                "not coded. Stage 3, one small Groth16 proof: a toy system that makes real test proofs. Stage 4, the "
+                "not coded. Stage 3, one small Groth16 proof: a small system that makes real test proofs. Stage 4, the "
                 "proof checker as lock gates: built, with gaps, 1.4 times the size the paper reports. Stage 5, the "
-                "lock: built at toy size.")
+                "lock: built, for tiny examples only.")
     p.band(LEFT, 20, FULL, "From a rule to a lock: what is built here", h=44)
     p.band(LEFT, 76, 430, "The five stages", fill=DARK, h=34)
     p.band(RIGHT, 76, 430, "In this repository", fill=DARK, h=34)
@@ -313,11 +313,11 @@ def pipeline():
         ("Proof of the run", ["A zero-knowledge machine proves that", "the program said yes."],
          "NOT CODED", ["The paper uses an existing machine.", "A rule would be rewritten for it."]),
         ("One small proof", ["That proof is wrapped into a single", "Groth16 proof of fixed size."],
-         "TOY SIZE", ["A small Groth16 system that makes real", "test proofs (encoding/groth16.py)."]),
+         "TINY EXAMPLES ONLY", ["A small Groth16 system that makes real", "test proofs (encoding/groth16.py)."]),
         ("Proof checker as lock gates", ["“This proof is valid”, rewritten as", "equations over bits."],
          "BUILT, WITH GAPS", ["Checks real proofs, at 1.4× the size the", "paper reports (praxis_lock/encoding/)."]),
         ("The lock", ["A key sealed so that only a solution", "of those equations opens it."],
-         "TOY SIZE", ["The real scheme, on small statements.", "Full size, about 8 GB a key piece, does not run."]),
+         "TINY EXAMPLES ONLY", ["The real scheme, on small statements.", "Full size, about 8 GB a key piece, does not run."]),
     ]
     top, h, pitch = 120, 78, 90
     for i, (title, what, state, here) in enumerate(stages):
@@ -338,7 +338,7 @@ def examples():
     p = Picture(574, "Three other locks, step by step",
                 "Each follows the bridge's pattern: seal a secret to a rule, wait until the rule can be proven, open. "
                 "Time lock (modelled here): sealed to Bitcoin growing by a number of blocks; anyone opens it by "
-                "showing the block headers. Reward (toy demo here): sealed to a solution of a puzzle; the solver "
+                "showing the block headers. Reward (tiny demo here): sealed to a solution of a puzzle; the solver "
                 "opens it. Credential (not coded): sealed to holding a certificate; any holder opens it.")
     p.band(LEFT, 20, FULL, "Three other locks, step by step", h=44)
     rows = [
@@ -346,7 +346,7 @@ def examples():
          ["Anyone seals a message to: “Bitcoin", "has grown 52,560 blocks past block X.”"],
          ["About a year of blocks is mined.", "Nobody has to do anything."],
          ["Anyone shows the block headers", "and reads the message."]),
-        ("Reward for a solution", "TOY DEMO HERE",
+        ("Reward for a solution", "TINY DEMO HERE",
          ["A sponsor seals the key to a reward", "to: “here is a solution to this puzzle.”"],
          ["Someone finds a solution.", "The sponsor can be long gone."],
          ["The solver opens the lock and takes", "the reward. No judge decides."]),
@@ -395,7 +395,7 @@ def limits():
     for i, (title, rows) in enumerate(cards):
         p.card(THIRDS[i % 3], 78 + 116 * (i // 3), 280, 102, title, rows, bar=GREY, number=str(i + 1))
     p.strip(312, "On top of these, this repository has no security at all",
-            "The lock in bridge_sim/ is simulated and praxis_lock/ runs at toy size.")
+            "The lock in bridge_sim/ is simulated and praxis_lock/ only handles tiny examples.")
     p.save("limits.svg")
 
 

@@ -8,12 +8,13 @@ or group of signers holding the Bitcoin in between.
 
 > **Simulator only. This is not a bridge.** It touches no real network and no real
 > money. The bridge model uses a simulated lock, and the real lock included here runs
-> only at toy parameters with no security. Everything is a first draft written with
-> an AI assistant and has not been reviewed by cryptographers. Do not put funds
-> behind anything derived from it without independent audits.
+> only on tiny examples that anyone could open by trying every answer. Everything is
+> a first draft written with an AI assistant and has not been reviewed by
+> cryptographers. Do not put funds behind anything derived from it without
+> independent audits.
 
 <p align="center">
-  <img src="docs/overview.svg" width="900" alt="A Bitcoin to Solana bridge with no operator. On Bitcoin: a vault is made and its key is cut into pieces, each sealed in a lock and deleted; a user deposits Bitcoin; nobody holds the key. On Solana: the deposit is checked and the same amount is minted as tokens; tokens are used to launch and trade coins; a holder burns tokens and attaches the fingerprint of a secret. Proof of the burn plus the secret opens the lock and the burner moves the Bitcoin. The repository holds bridge_sim (the whole bridge as a runnable model with a simulated lock), praxis_lock (the lock scheme at toy size) and praxis_lock/encoding (a proof checker rewritten for the lock). Simulator only.">
+  <img src="docs/overview.svg" width="900" alt="A Bitcoin to Solana bridge with no operator. On Bitcoin: a vault is made and its key is cut into pieces, each sealed in a lock and deleted; a user deposits Bitcoin; nobody holds the key. On Solana: the deposit is checked and the same amount is minted as tokens; tokens are used to launch and trade coins; a holder burns tokens and attaches the fingerprint of a secret. Proof of the burn plus the secret opens the lock and the burner moves the Bitcoin. The repository holds bridge_sim (the whole bridge as a runnable model with a simulated lock), praxis_lock (the lock scheme, working on tiny examples) and praxis_lock/encoding (a proof checker rewritten for the lock). Simulator only.">
 </p>
 
 ## Today, using Bitcoin on another network means trusting whoever holds it
@@ -38,14 +39,15 @@ terabytes, and it needs no change to Bitcoin.
 This project is independent. It is not affiliated with the paper's authors, Babylon,
 Bitcoin or Solana, and the bridge design here is not taken from the paper.
 
-## Three parts: a bridge model, the lock at toy size, a proof checker for the lock
+## Three parts: a bridge model, a working lock for tiny examples, a proof checker for the lock
 
 All three are meant to be read, run and attacked.
 
 - **`bridge_sim/`** A runnable model of a trust-minimised Bitcoin to Solana bridge
   built on witness encryption, with coin launches priced in the bridged Bitcoin.
-- **`praxis_lock/`** A reference implementation of the witness-encryption scheme
-  itself, at toy parameters, with real BN254 pairings.
+- **`praxis_lock/`** The lock itself: the paper's witness-encryption scheme written
+  out in Python. It locks and opens for real, with real BN254 pairings, but only on
+  tiny examples.
 - **`praxis_lock/encoding/`** An encoding of a Groth16 proof checker in the form
   the lock understands, so that "holds a valid proof" becomes something a key can
   be locked to. It works on real proofs. It is about 1.4 times larger than the
@@ -127,7 +129,7 @@ retired validator set could forge a burn. With it, Bitcoin's block order decides
 
 | Part | In this model | In a real bridge |
 |---|---|---|
-| Witness-encryption lock | The bridge model uses a simulated lock: an object that releases its secret only when the rule accepts. The real scheme is in `praxis_lock/`, at toy parameters, not yet wired to the bridge | A public ciphertext of about 8 GB per key piece |
+| Witness-encryption lock | The bridge model uses a simulated lock: an object that releases its secret only when the rule accepts. The real scheme is in `praxis_lock/`, working on tiny examples only, not yet wired to the bridge | A public ciphertext of about 8 GB per key piece |
 | The vault rule | Real logic, in plain Python | The same logic compiled into a zero-knowledge circuit |
 | Proof checker as a lock statement | Built and tested on real proofs in `praxis_lock/encoding/`, at about 0.56 million bits with known gaps; not wired to the lock or the bridge | An audited encoding at the paper's size, about 0.39 million bits |
 | Bitcoin | Real proof of work, Merkle proofs and coin tracking at tiny difficulty; no fees or scripts | Bitcoin |
@@ -211,7 +213,7 @@ A vault that has already been redeemed is not exposed; a test confirms this.
 
 ## Six reasons this is not a bridge yet
 
-- The lock here runs only at toy parameters. No implementation at secure parameters
+- The lock here runs only on tiny examples. No implementation at secure parameters
   exists, here or publicly, and the paper is unreviewed.
 - The proof checker written as a lock statement is about 1.4 times larger than the
   paper's and has known gaps, and the lock here cannot encrypt to it.
@@ -232,16 +234,16 @@ without a custodian, proof verification and covenants.
 
 The uses fall into two groups. Three are coded here in some form: moving Bitcoin to
 another network (the bridge, modelled), a time capsule (the time lock, modelled) and
-a prize that pays itself (the reward, as a toy demo).
+a prize that pays itself (the reward, as a tiny demo).
 
 <p align="center">
-  <img src="docs/use-cases.svg" width="900" alt="Use cases, in two groups. Money on Bitcoin: borrow against Bitcoin with no company holding your coins; move Bitcoin to other networks without a trusted keeper (modelled here); self-custody safes with delays and approved addresses; prizes that pay themselves, with money released by a correct proof (toy demo here). Alarms and information: tripwire alarms, where coins move if encryption is broken; time capsules that open when Bitcoin reaches a block (modelled here); an inheritance switch that releases keys after missed check-ins; credential-locked files, readable only with proof of ID. Not yet proven: new and unreviewed, and it needs an honest one-time setup.">
+  <img src="docs/use-cases.svg" width="900" alt="Use cases, in two groups. Money on Bitcoin: borrow against Bitcoin with no company holding your coins; move Bitcoin to other networks without a trusted keeper (modelled here); self-custody safes with delays and approved addresses; prizes that pay themselves, with money released by a correct proof (tiny demo here). Alarms and information: tripwire alarms, where coins move if encryption is broken; time capsules that open when Bitcoin reaches a block (modelled here); an inheritance switch that releases keys after missed check-ins; credential-locked files, readable only with proof of ID. Not yet proven: new and unreviewed, and it needs an honest one-time setup.">
 </p>
 
 Six rules written out, with how far each is coded:
 
 <p align="center">
-  <img src="docs/uses.svg" width="900" alt="One lock, many uses. A secret is sealed to a rule and opens for anyone who can prove the rule was met. Six rules: a bridge without a custodian and a time lock (both modelled here), a reward for a solution (toy demo here), and three that are not coded: sending to a credential, paying on Bitcoin for a proof, and spending rules on Bitcoin.">
+  <img src="docs/uses.svg" width="900" alt="One lock, many uses. A secret is sealed to a rule and opens for anyone who can prove the rule was met. Six rules: a bridge without a custodian and a time lock (both modelled here), a reward for a solution (tiny demo here), and three that are not coded: sending to a credential, paying on Bitcoin for a proof, and spending rules on Bitcoin.">
 </p>
 
 What this repository has of each use:
@@ -251,7 +253,7 @@ What this repository has of each use:
 | Bridge without a custodian | these tokens were burned on Solana, and I know the secret behind the burn | **Modelled** end to end in `bridge_sim/`, with a simulated lock |
 | Coin launches priced in bridged Bitcoin | uses the bridge; no lock of its own | **Modelled** in `bridge_sim/launchpad.py` |
 | Time lock | Bitcoin has grown N blocks past block X | **Modelled** in `bridge_sim/timelock.py`, with the same simulated lock. It counts blocks on the model's small chain at one fixed difficulty, and blocks mined in secret open it early; a test shows that |
-| Reward for a solution | here is a solution to this puzzle | **Toy demo.** `demo_lock.py` seals a message to "two numbers whose product is 47,053" with the real lock at toy size; `demo_encoding.py` checks a real Groth16 proof of the same claim with the lock's gates |
+| Reward for a solution | here is a solution to this puzzle | **Tiny demo.** `demo_lock.py` seals a message to "two numbers whose product is 47,053" with the real lock; `demo_encoding.py` checks a real Groth16 proof of the same claim with the lock's gates |
 | Sending to a credential | I hold a certificate, signed by this key, that says so-and-so | **Not coded** |
 | Paying on Bitcoin when a proof exists | this program ran on this input and gave this result | **Not coded.** The proof checker in `praxis_lock/encoding/` is the piece it would rest on |
 | Spending rules on Bitcoin (covenants) | this spend follows the rule the coins were sealed under | **Not coded** |
@@ -269,12 +271,13 @@ same kind of statement, "a valid proof exists for this program", which is what
 `praxis_lock/encoding/` writes out. A new use needs a new rule and nothing else.
 
 Of the five stages below, this repository has two rules (the bridge's and a small
-time lock, both plain Python handed to the simulated lock), a toy Groth16 system,
-the proof checker with known gaps, and the lock at toy size. The zero-knowledge
+time lock, both plain Python handed to the simulated lock), a small Groth16 system
+for test proofs, the proof checker with known gaps, and the lock working on tiny
+examples. The zero-knowledge
 machine is not here at all, and nothing is joined up from end to end.
 
 <p align="center">
-  <img src="docs/pipeline.svg" width="900" alt="From a rule to a lock in five stages, with what this repository has of each. 1 The rule, a program that answers yes or no: two rules are written in plain Python, the bridge's and a small time lock. 2 Proof of the run by a zero-knowledge machine: not coded. 3 One small Groth16 proof: a toy system that makes real test proofs. 4 The proof checker as lock gates: built with gaps, 1.4 times the size the paper reports. 5 The lock: the real scheme on small statements only. Stages 2 to 5 are the same for every use.">
+  <img src="docs/pipeline.svg" width="900" alt="From a rule to a lock in five stages, with what this repository has of each. 1 The rule, a program that answers yes or no: two rules are written in plain Python, the bridge's and a small time lock. 2 Proof of the run by a zero-knowledge machine: not coded. 3 One small Groth16 proof: a small system that makes real test proofs. 4 The proof checker as lock gates: built with gaps, 1.4 times the size the paper reports. 5 The lock: the real scheme on small statements only. Stages 2 to 5 are the same for every use.">
 </p>
 
 ### A time lock, a reward and a credential, step by step
@@ -283,7 +286,7 @@ Each follows the bridge's pattern: seal a secret to a rule, wait until the rule 
 be proven, open.
 
 <p align="center">
-  <img src="docs/examples.svg" width="900" alt="Three other locks step by step. Time lock (modelled here): anyone seals a message to Bitcoin growing 52,560 blocks past a block; about a year of blocks is mined; anyone shows the block headers and reads the message. Reward for a solution (toy demo here): a sponsor seals the key to a reward to a solution of a puzzle; someone finds one; the solver opens the lock, no judge decides. Sending to a credential (not coded): a sender seals a file to holding a registry's certificate; a doctor holds one; any holder opens it and the sender never learns who.">
+  <img src="docs/examples.svg" width="900" alt="Three other locks step by step. Time lock (modelled here): anyone seals a message to Bitcoin growing 52,560 blocks past a block; about a year of blocks is mined; anyone shows the block headers and reads the message. Reward for a solution (tiny demo here): a sponsor seals the key to a reward to a solution of a puzzle; someone finds one; the solver opens the lock, no judge decides. Sending to a credential (not coded): a sender seals a file to holding a registry's certificate; a doctor holds one; any holder opens it and the sender never learns who.">
 </p>
 
 ### Six far-future uses, all speculation
@@ -325,7 +328,7 @@ physical events, and a version of the scheme that is safe against quantum comput
 - **Not safe against quantum computers, and not reviewed.** The paper is new, and
   nothing here has any security at the sizes it runs.
 
-## The lock itself: the paper's scheme in Python, at toy size
+## The lock itself: the paper's scheme in Python, working on tiny examples only
 
 `praxis_lock/` is a Python transcription of the Praxis scheme from the definitions
 in the authors' machine-checked Lean development
@@ -364,7 +367,7 @@ What the tests establish:
 
 What it is not:
 
-- **Not secure.** Toy statements have a handful of unknown bits and can be solved
+- **Not secure.** The statements it can handle have a handful of unknown bits and can be solved
   by trying every answer. Security needs the paper's parameters.
 - **Not able to run at the paper's parameters.** Those need an 8 GB ciphertext and
   polynomials of degree 3.8 million; this code is quadratic-time Python.
