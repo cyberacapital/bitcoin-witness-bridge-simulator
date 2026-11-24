@@ -1,43 +1,48 @@
-"""Draws the five pictures used in the README.
+"""Draws the five figures used in the README.
 
 Run with:  python docs/figures.py        (no dependencies; writes the .svg files next to itself)
 
-The pictures are plain SVG with their own light background, so they read the
-same on a light and a dark page. Texts are set line by line; if you change one,
-open the file in a browser and check that it still fits its box.
+The figures follow the layout of a UK government policy paper: a numbered title
+over a rule, square boxes, one accent colour, and a note and a source line at
+the foot. They are plain SVG on a white ground, so they read the same on a light
+and a dark page. Texts are set line by line; if you change one, open the file
+in a browser and check that it still fits its box. The figure numbers are the
+ones the README uses; change them here if a chapter moves.
 """
 import pathlib
 from xml.sax.saxutils import escape
 
 HERE = pathlib.Path(__file__).resolve().parent
 
-INK, MUTED, LINE, PAPER, EDGE = "#1F2328", "#57606A", "#D0D7DE", "#FCFBF8", "#E5E1D8"
-BTC, BTC_SOFT = "#C96A00", "#FFF1DD"            # things that happen on Bitcoin
-SOL, SOL_SOFT = "#6D3FD6", "#F1EAFE"            # things that happen on Solana
-FONT = "Helvetica, Arial, 'Liberation Sans', sans-serif"
+INK, MUTED, LINE, EDGE, SHADE, PAPER = "#0B0C0C", "#505A5F", "#B1B4B6", "#DADCDD", "#F3F2F1", "#FFFFFF"
+ACCENT, ACCENT_SOFT = "#8F1D2C", "#F7E9EB"      # the one accent colour; also things that happen on Bitcoin
+SECOND, SECOND_SOFT = "#1D4E7A", "#E7EEF5"      # things that happen on Solana
+BTC, BTC_SOFT, SOL, SOL_SOFT = ACCENT, ACCENT_SOFT, SECOND, SECOND_SOFT
+FONT = "Arial, Helvetica, 'Liberation Sans', sans-serif"
 MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace"
+SOURCE = "Source: Bitcoin Witness Bridge Simulator."
 
-# How far along a part is in this repository: (text colour, background).
+# How far along a part is in this repository: (text colour, fill, border).
 STATUS = {
-    "MODELLED HERE": ("#1A7F37", "#DDF4E4"),
-    "TOY DEMO HERE": ("#0969DA", "#DDF0FF"),
-    "TOY SIZE": ("#0969DA", "#DDF0FF"),
-    "BUILT, WITH GAPS": ("#9A6700", "#FFF4D4"),
-    "TWO RULES WRITTEN": ("#9A6700", "#FFF4D4"),
-    "NOT CODED": ("#57606A", "#EAEEF2"),
+    "MODELLED HERE": (PAPER, INK, INK),
+    "TOY DEMO HERE": (INK, PAPER, INK),
+    "TOY SIZE": (INK, PAPER, INK),
+    "TWO RULES WRITTEN": (INK, PAPER, INK),
+    "BUILT, WITH GAPS": (ACCENT, PAPER, ACCENT),
+    "NOT CODED": (MUTED, SHADE, LINE),
 }
 
 
 class Picture:
-    def __init__(self, width, height, title, description):
-        self.w, self.h, self.parts = width, height, []
+    def __init__(self, width, height, label, title, description):
+        self.w, self.h, self.label, self.title, self.parts = width, height, label, title, []
         self.add(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" '
                  f'height="{height}" role="img" aria-labelledby="t d" font-family="{FONT}">')
-        self.add(f'<title id="t">{escape(title)}</title>')
+        self.add(f'<title id="t">{escape(label + ": " + title)}</title>')
         self.add(f'<desc id="d">{escape(description)}</desc>')
         self.add('<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" '
                  f'orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="{MUTED}"/></marker></defs>')
-        self.add(f'<rect x="0.5" y="0.5" width="{width - 1}" height="{height - 1}" rx="14" fill="{PAPER}" stroke="{EDGE}"/>')
+        self.add(f'<rect width="{width}" height="{height}" fill="{PAPER}"/>')
 
     def add(self, markup):
         self.parts.append(markup)
@@ -52,19 +57,25 @@ class Picture:
         for i, row in enumerate(rows):
             self.text(x, y + leading * i, row, **look)
 
-    def heading(self, title, subtitle):
-        self.text(40, 52, title, size=24, weight=700)
-        self.text(40, 78, subtitle, size=14, fill=MUTED)
+    def rule(self, y, colour=LINE, width=1):
+        self.add(f'<line x1="40" y1="{y}" x2="{self.w - 40}" y2="{y}" stroke="{colour}" stroke-width="{width}"/>')
 
-    def box(self, x, y, w, h, fill="#FFFFFF", stroke=LINE, dashed=False):
+    def heading(self, subtitle):
+        """The numbered title over a rule, then one sentence saying what the figure shows."""
+        self.text(40, 38, f"{self.label}: {self.title}", size=17, weight=700)
+        self.rule(51, INK, 1.5)
+        self.text(40, 76, subtitle, size=13.5, fill=MUTED)
+
+    def box(self, x, y, w, h, fill=PAPER, stroke=LINE, dashed=False):
         dash = ' stroke-dasharray="5 4"' if dashed else ""
-        self.add(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{fill}" stroke="{stroke}"{dash}/>')
+        self.add(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill}" stroke="{stroke}"{dash}/>')
 
-    def tag(self, x, y, words, colour, soft, anchor="start"):
-        """A small rounded label. (x, y) is its left end and text baseline, or its right end if anchor is 'end'."""
+    def tag(self, x, y, words, colour, fill, border=None, anchor="start"):
+        """A small label. (x, y) is its left end and text baseline, or its right end if anchor is 'end'."""
         width = round(8.2 * len(words) + 16)
         left = x - width if anchor == "end" else x
-        self.add(f'<rect x="{left}" y="{y - 13}" width="{width}" height="19" rx="9.5" fill="{soft}"/>')
+        edge = f' stroke="{border}"' if border else ""
+        self.add(f'<rect x="{left}" y="{y - 13}" width="{width}" height="19" fill="{fill}"{edge}/>')
         self.text(left + 8, y + 1, words, size=11, weight=700, fill=colour, spacing="0.8")
         return width
 
@@ -72,26 +83,28 @@ class Picture:
         return self.tag(x, y, words, *STATUS[words], anchor=anchor)
 
     def badge(self, x, y, words, colour, soft):
-        """A number in a pill; returns its width."""
+        """A number in a small square; returns its width."""
         width = 22 if len(words) == 1 else 36
-        self.add(f'<rect x="{x}" y="{y}" width="{width}" height="22" rx="11" fill="{soft}"/>')
+        self.add(f'<rect x="{x}" y="{y}" width="{width}" height="22" fill="{soft}"/>')
         self.text(x + width / 2, y + 15.5, words, weight=700, anchor="middle", fill=colour)
         return width
 
     def arrow(self, x1, y1, x2, y2):
         self.add(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{MUTED}" stroke-width="1.6" marker-end="url(#a)"/>')
 
-    def padlock(self, cx, cy, hole="#F6F8FA"):
+    def padlock(self, cx, cy, hole=SHADE):
         self.add(f'<path d="M{cx - 13} {cy - 6} v-9 a13 13 0 0 1 26 0 v9" fill="none" stroke="{INK}" '
                  f'stroke-width="5" stroke-linecap="round"/>')
-        self.add(f'<rect x="{cx - 21}" y="{cy - 6}" width="42" height="32" rx="6" fill="{INK}"/>')
+        self.add(f'<rect x="{cx - 21}" y="{cy - 6}" width="42" height="32" rx="3" fill="{INK}"/>')
         self.add(f'<circle cx="{cx}" cy="{cy + 7}" r="4.2" fill="{hole}"/>'
                  f'<rect x="{cx - 1.6}" y="{cy + 8}" width="3.2" height="9" rx="1.6" fill="{hole}"/>')
 
-    def footnote(self, y, bold, rest, dot="#B35900"):
-        self.add(f'<circle cx="46" cy="{y - 4.5}" r="4.5" fill="{dot}"/>')
-        self.add(f'<text x="58" y="{y}" font-size="12.5" fill="{INK}"><tspan font-weight="700">{escape(bold)}</tspan>'
+    def foot(self, y, bold, rest, source=SOURCE):
+        """A rule, a note with a bold lead, and the source line. The picture should end about 30 below y."""
+        self.rule(y - 20)
+        self.add(f'<text x="40" y="{y}" font-size="12.5" fill="{INK}"><tspan font-weight="700">{escape(bold)}</tspan>'
                  f' {escape(rest)}</text>')
+        self.text(40, y + 19, source, size=11.5, fill=MUTED)
 
     def save(self, name):
         (HERE / name).write_text("\n".join(self.parts + ["</svg>"]) + "\n")
@@ -99,7 +112,7 @@ class Picture:
 
 def step(p, x, y, number, title, rows, colour, soft, w=200, h=120):
     p.box(x, y, w, h)
-    p.add(f'<rect x="{x}" y="{y}" width="5" height="{h}" rx="2.5" fill="{colour}"/>')
+    p.add(f'<rect x="{x}" y="{y}" width="4" height="{h}" fill="{colour}"/>')
     width = p.badge(x + 16, y + 13, number, colour, soft)
     p.text(x + 16 + width + 9, y + 29.5, title, size=15.5, weight=700)
     p.lines(x + 16, y + 58, rows)
@@ -108,13 +121,12 @@ def step(p, x, y, number, title, rows, colour, soft, w=200, h=120):
 # ---------------------------------------------------------------- 1. the bridge, at the top of the README
 
 def overview():
-    p = Picture(960, 640, "How the simulated bridge works, and what is in this repository",
+    p = Picture(960, 654, "Figure 1", "A Bitcoin to Solana bridge with no operator",
                 "Bitcoin is sent to a vault whose key is sealed in a lock. Solana mints the same amount as tokens. "
                 "Tokens are used to launch and trade coins. Burning tokens gives a proof that opens the lock and "
                 "releases the Bitcoin. The repository holds a model of the bridge, the lock scheme at toy size, "
                 "and a proof checker written for the lock.")
-    p.heading("A Bitcoin to Solana bridge with no operator",
-              "Bitcoin is locked so that only proof of a burn on Solana can release it. "
+    p.heading("Bitcoin is locked so that only proof of a burn on Solana can release it. "
               "This repository models that from end to end.")
     cols, top, low, w, h = [40, 267, 493, 720], 124, 312, 200, 120
 
@@ -122,7 +134,7 @@ def overview():
     step(p, cols[0], top, "1", "Seal", ["A vault is made. Its key is", "cut into pieces, each sealed", "in a lock, then deleted."], BTC, BTC_SOFT)
     step(p, cols[1], top, "2", "Deposit", ["A user sends Bitcoin to", "the vault."], BTC, BTC_SOFT)
     step(p, cols[3], top, "7", "Open", ["The proof opens the lock.", "The burner gets the key and", "moves the Bitcoin."], BTC, BTC_SOFT)
-    p.box(cols[2], top, w, h, fill="#F6F8FA", stroke=MUTED, dashed=True)
+    p.box(cols[2], top, w, h, fill=SHADE, stroke=MUTED, dashed=True)
     p.padlock(cols[2] + w / 2, top + 44)
     p.text(cols[2] + w / 2, top + 92, "Nobody holds the key.", weight=700, anchor="middle")
     p.text(cols[2] + w / 2, top + 109, "Opens only for a valid proof.", fill=MUTED, anchor="middle")
@@ -144,7 +156,7 @@ def overview():
     p.text(cols[1] + w / 2 + 12, between, "proof of deposit", fill=MUTED, style="italic")
     p.text(cols[3] + w / 2 - 12, between, "proof of burn, plus the secret", fill=MUTED, style="italic", anchor="end")
 
-    p.add(f'<line x1="40" y1="462" x2="920" y2="462" stroke="{EDGE}"/>')
+    p.rule(462)
     p.text(40, 490, "What is in the repository", size=15.5, weight=700)
     cards = [("bridge_sim/", ["The whole bridge as a runnable model,", "attacks included. Its lock is simulated."]),
              ("praxis_lock/", ["The lock scheme itself, from the Praxis", "paper, at toy size with real pairings."]),
@@ -154,27 +166,26 @@ def overview():
         p.box(x, 504, 280, 84)
         p.text(x + 16, 531, name, size=13.5, weight=700, family=MONO)
         p.lines(x + 16, 553, rows, leading=17, fill=MUTED)
-    p.footnote(618, "Simulator only.", "No real network, no real money, not audited.")
+    p.foot(620, "Simulator only.", "No real network, no real money, not audited.")
     p.save("overview.svg")
 
 
 # ---------------------------------------------------------------- 2. one lock, many uses
 
 def uses():
-    p = Picture(960, 668, "One lock, many uses, and which of them are coded in this repository",
+    p = Picture(960, 668, "Figure 2.A", "One lock, many uses",
                 "A secret is sealed to a rule and opens for whoever can prove the rule was met. Six uses: a bridge "
                 "without a custodian and a time lock (both modelled here), a reward for a solution (toy demo "
                 "here), and three that are not coded: sending to a credential, paying on Bitcoin when a proof "
                 "exists, and spending rules on Bitcoin.")
-    p.heading("One lock, many uses",
-              "The lock opens for whoever can prove that a rule was met. Change the rule and the same lock does another job.")
+    p.heading("The lock opens for whoever can prove that a rule was met. Change the rule and the same lock does another job.")
 
     # the pattern
     y, h = 104, 92
     p.box(40, y, 250, h)
     p.text(60, y + 30, "A secret", size=15.5, weight=700)
     p.lines(60, y + 53, ["a key, a file, a message"], fill=MUTED)
-    p.box(355, y, 250, h, fill="#F6F8FA", stroke=MUTED, dashed=True)
+    p.box(355, y, 250, h, fill=SHADE, stroke=MUTED, dashed=True)
     p.padlock(397, y + 43)
     p.text(432, y + 30, "sealed to a rule", size=15.5, weight=700)
     p.lines(432, y + 53, ["“someone can prove", "that ...”"], fill=MUTED, style="italic")
@@ -214,22 +225,22 @@ def uses():
         p.lines(x + 16, y + 99, rule, leading=17, style="italic")
         p.add(f'<line x1="{x + 16}" y1="{y + 126}" x2="{x + 264}" y2="{y + 126}" stroke="{EDGE}"/>')
         p.lines(x + 16, y + 145, where, size=11.5, fill=MUTED)
-    p.footnote(644, "Only the rule changes.", "The lock and the proof checker are the same for every use. "
-               "None of it runs at real size here.")
+    p.foot(634, "Only the rule changes.", "The lock and the proof checker are the same for every use. "
+           "None of it runs at real size here.",
+           SOURCE + " All but the reward are uses named in the Praxis paper (ePrint 2026/2971).")
     p.save("uses.svg")
 
 
 # ---------------------------------------------------------------- 3. from a rule to a lock
 
 def pipeline():
-    p = Picture(960, 644, "From a rule to a lock: the five stages and what this repository has of each",
+    p = Picture(960, 668, "Figure 2.B", "From a rule to a lock: what is built here",
                 "Stage 1, the rule as a program: two rules are written, in plain Python: the bridge's and a small "
                 "time lock. Stage 2, a proof "
                 "that the program said yes: not coded. Stage 3, one small Groth16 proof: a toy system that makes "
                 "real test proofs. Stage 4, the proof checker as lock gates: built, with gaps, 1.4 times the size "
                 "the paper reports. Stage 5, the lock: built at toy size.")
-    p.heading("From a rule to a lock: what is built here",
-              "Every use goes through the same five stages. Only the first is written for each use.")
+    p.heading("Every use goes through the same five stages. Only the first is written for each use.")
     p.text(96, 116, "STAGE", size=11, weight=700, fill=MUTED, spacing="0.8")
     p.text(500, 116, "IN THIS REPOSITORY", size=11, weight=700, fill=MUTED, spacing="0.8")
     stages = [
@@ -248,7 +259,7 @@ def pipeline():
     for i, (title, what, state, here) in enumerate(stages):
         y = top + i * (h + gap)
         p.box(40, y, 880, h)
-        p.badge(56, y + 29, str(i + 1), INK, "#EAEEF2")
+        p.badge(56, y + 29, str(i + 1), INK, SHADE)
         p.text(96, y + 27, title, size=15.5, weight=700)
         p.lines(96, y + 48, what, leading=17, fill=MUTED)
         p.add(f'<line x1="484" y1="{y + 12}" x2="484" y2="{y + h - 12}" stroke="{EDGE}"/>')
@@ -256,21 +267,21 @@ def pipeline():
         p.lines(500, y + 48, here, leading=17)
         if i:
             p.arrow(67, y - gap + 2, 67, y - 3)
-    p.footnote(top + 5 * (h + gap) + 14, "Stages 2 to 5 are the same for every use.",
-               "A new use needs only a new rule in stage 1.", dot=INK)
+    p.foot(top + 5 * (h + gap) + 16, "Stages 2 to 5 are the same for every use.",
+           "A new use needs only a new rule in stage 1.",
+           SOURCE[:-1] + "; the five stages follow the design in the Praxis paper (ePrint 2026/2971).")
     p.save("pipeline.svg")
 
 
 # ---------------------------------------------------------------- 4. three other locks, step by step
 
 def examples():
-    p = Picture(960, 572, "Three other locks, step by step: a time lock, a reward for a solution, sending to a credential",
+    p = Picture(960, 584, "Figure 2.C", "Three other locks, step by step",
                 "Each follows the bridge's pattern: seal a secret to a rule, wait until the rule can be proven, open. "
                 "Time lock: sealed to Bitcoin growing by a number of blocks; anyone opens it by showing the block "
                 "headers. Reward: sealed to a solution of a puzzle; the solver opens it. Credential: sealed to "
                 "holding a certificate; any holder opens it.")
-    p.heading("Three other locks, step by step",
-              "Each follows the bridge's pattern: seal a secret to a rule, wait until the rule can be proven, open.")
+    p.heading("Each follows the bridge's pattern: seal a secret to a rule, wait until the rule can be proven, open.")
     rows = [
         ("Time lock", "MODELLED HERE",
          ["Anyone seals a message to: “Bitcoin", "has grown 52,560 blocks past block X.”"],
@@ -296,22 +307,20 @@ def examples():
             p.lines(x + 16, y + 73, body, leading=18)
             if j:
                 p.arrow(x - 17, y + 28 + h / 2, x - 4, y + 28 + h / 2)
-    p.footnote(top + 3 * pitch + 22, "Limits shared by all of them:",
-               "the rule is fixed when the lock is made, and whoever holds a proof can open.")
+    p.foot(top + 3 * pitch + 24, "Limits shared by all of them:",
+           "the rule is fixed when the lock is made, and whoever holds a proof can open.")
     p.save("examples.svg")
 
 
 # ---------------------------------------------------------------- 5. what every use has to live with
 
 def limits():
-    p = Picture(960, 446, "Limits that every use of the lock shares",
+    p = Picture(960, 444, "Figure 2.D", "What every use has to live with",
                 "Six limits. The rule is fixed when the lock is made. Whoever has a proof opens it, once and for "
                 "all. Evidence can be forged at a price. Each sealed key piece is about 8 GB of public data in the "
                 "paper and about 11 GB with this repository's encoding. One setup stands behind every lock. It is "
                 "not safe against quantum computers and has not been reviewed.")
-    p.heading("What every use has to live with",
-              "These come from how the lock works, so they hold for the bridge and for every other rule.")
-    amber, soft = STATUS["BUILT, WITH GAPS"]
+    p.heading("These come from how the lock works, so they hold for the bridge and for every other rule.")
     cards = [
         ("The rule is fixed",
          ["It is set when the lock is made and", "cannot be changed or withdrawn.", "It sees only what a proof shows it."]),
@@ -327,9 +336,10 @@ def limits():
          ["The paper is from 2026 and has not", "been reviewed. The scheme is not", "safe against quantum computers."]),
     ]
     for i, (title, rows) in enumerate(cards):
-        step(p, 40 + 300 * (i % 3), 104 + 140 * (i // 3), str(i + 1), title, rows, amber, soft, w=280, h=122)
-    p.footnote(406, "On top of these, this repository has no security at all:",
-               "the lock in bridge_sim/ is simulated and praxis_lock/ runs at toy size.")
+        step(p, 40 + 300 * (i % 3), 104 + 140 * (i // 3), str(i + 1), title, rows, ACCENT, ACCENT_SOFT, w=280, h=122)
+    p.foot(406, "On top of these, this repository has no security at all:",
+           "the lock in bridge_sim/ is simulated and praxis_lock/ runs at toy size.",
+           SOURCE[:-1] + "; sizes from the Praxis paper (ePrint 2026/2971) and from this repository's encoding.")
     p.save("limits.svg")
 
 

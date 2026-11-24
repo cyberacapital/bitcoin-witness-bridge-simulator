@@ -1,71 +1,73 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 644" width="960" height="644" role="img" aria-labelledby="t d" font-family="Helvetica, Arial, 'Liberation Sans', sans-serif">
-<title id="t">From a rule to a lock: the five stages and what this repository has of each</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 668" width="960" height="668" role="img" aria-labelledby="t d" font-family="Arial, Helvetica, 'Liberation Sans', sans-serif">
+<title id="t">Figure 2.B: From a rule to a lock: what is built here</title>
 <desc id="d">Stage 1, the rule as a program: two rules are written, in plain Python: the bridge's and a small time lock. Stage 2, a proof that the program said yes: not coded. Stage 3, one small Groth16 proof: a toy system that makes real test proofs. Stage 4, the proof checker as lock gates: built, with gaps, 1.4 times the size the paper reports. Stage 5, the lock: built at toy size.</desc>
-<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#57606A"/></marker></defs>
-<rect x="0.5" y="0.5" width="959" height="643" rx="14" fill="#FCFBF8" stroke="#E5E1D8"/>
-<text x="40" y="52" font-size="24" fill="#1F2328" font-weight="700">From a rule to a lock: what is built here</text>
-<text x="40" y="78" font-size="14" fill="#57606A">Every use goes through the same five stages. Only the first is written for each use.</text>
-<text x="96" y="116" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">STAGE</text>
-<text x="500" y="116" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">IN THIS REPOSITORY</text>
-<rect x="40" y="128" width="880" height="80" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
-<rect x="56" y="157" width="22" height="22" rx="11" fill="#EAEEF2"/>
-<text x="67.0" y="172.5" font-size="12.5" fill="#1F2328" font-weight="700" text-anchor="middle">1</text>
-<text x="96" y="155" font-size="15.5" fill="#1F2328" font-weight="700">The rule</text>
-<text x="96" y="176" font-size="12.5" fill="#57606A">A program that looks at evidence</text>
-<text x="96" y="193" font-size="12.5" fill="#57606A">and answers yes or no.</text>
-<line x1="484" y1="140" x2="484" y2="196" stroke="#E5E1D8"/>
-<rect x="500" y="141" width="155" height="19" rx="9.5" fill="#FFF4D4"/>
-<text x="508" y="155" font-size="11" fill="#9A6700" font-weight="700" letter-spacing="0.8">TWO RULES WRITTEN</text>
-<text x="500" y="176" font-size="12.5" fill="#1F2328">The bridge's rule and a small time lock,</text>
-<text x="500" y="193" font-size="12.5" fill="#1F2328">in plain Python (bridge_sim/).</text>
-<rect x="40" y="226" width="880" height="80" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
-<rect x="56" y="255" width="22" height="22" rx="11" fill="#EAEEF2"/>
-<text x="67.0" y="270.5" font-size="12.5" fill="#1F2328" font-weight="700" text-anchor="middle">2</text>
-<text x="96" y="253" font-size="15.5" fill="#1F2328" font-weight="700">Proof of the run</text>
-<text x="96" y="274" font-size="12.5" fill="#57606A">A zero-knowledge machine proves that</text>
-<text x="96" y="291" font-size="12.5" fill="#57606A">the program said yes.</text>
-<line x1="484" y1="238" x2="484" y2="294" stroke="#E5E1D8"/>
-<rect x="500" y="239" width="90" height="19" rx="9.5" fill="#EAEEF2"/>
-<text x="508" y="253" font-size="11" fill="#57606A" font-weight="700" letter-spacing="0.8">NOT CODED</text>
-<text x="500" y="274" font-size="12.5" fill="#1F2328">The paper uses an existing machine.</text>
-<text x="500" y="291" font-size="12.5" fill="#1F2328">A rule would be rewritten for it.</text>
-<line x1="67" y1="210" x2="67" y2="223" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="40" y="324" width="880" height="80" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
-<rect x="56" y="353" width="22" height="22" rx="11" fill="#EAEEF2"/>
-<text x="67.0" y="368.5" font-size="12.5" fill="#1F2328" font-weight="700" text-anchor="middle">3</text>
-<text x="96" y="351" font-size="15.5" fill="#1F2328" font-weight="700">One small proof</text>
-<text x="96" y="372" font-size="12.5" fill="#57606A">That proof is wrapped into a single</text>
-<text x="96" y="389" font-size="12.5" fill="#57606A">Groth16 proof of fixed size.</text>
-<line x1="484" y1="336" x2="484" y2="392" stroke="#E5E1D8"/>
-<rect x="500" y="337" width="82" height="19" rx="9.5" fill="#DDF0FF"/>
-<text x="508" y="351" font-size="11" fill="#0969DA" font-weight="700" letter-spacing="0.8">TOY SIZE</text>
-<text x="500" y="372" font-size="12.5" fill="#1F2328">A small Groth16 system that makes real</text>
-<text x="500" y="389" font-size="12.5" fill="#1F2328">test proofs (encoding/groth16.py).</text>
-<line x1="67" y1="308" x2="67" y2="321" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="40" y="422" width="880" height="80" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
-<rect x="56" y="451" width="22" height="22" rx="11" fill="#EAEEF2"/>
-<text x="67.0" y="466.5" font-size="12.5" fill="#1F2328" font-weight="700" text-anchor="middle">4</text>
-<text x="96" y="449" font-size="15.5" fill="#1F2328" font-weight="700">Proof checker as lock gates</text>
-<text x="96" y="470" font-size="12.5" fill="#57606A">“This proof is valid”, rewritten as</text>
-<text x="96" y="487" font-size="12.5" fill="#57606A">equations over bits.</text>
-<line x1="484" y1="434" x2="484" y2="490" stroke="#E5E1D8"/>
-<rect x="500" y="435" width="147" height="19" rx="9.5" fill="#FFF4D4"/>
-<text x="508" y="449" font-size="11" fill="#9A6700" font-weight="700" letter-spacing="0.8">BUILT, WITH GAPS</text>
-<text x="500" y="470" font-size="12.5" fill="#1F2328">Checks real proofs, at 1.4× the size the</text>
-<text x="500" y="487" font-size="12.5" fill="#1F2328">paper reports (praxis_lock/encoding/).</text>
-<line x1="67" y1="406" x2="67" y2="419" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="40" y="520" width="880" height="80" rx="10" fill="#FFFFFF" stroke="#D0D7DE"/>
-<rect x="56" y="549" width="22" height="22" rx="11" fill="#EAEEF2"/>
-<text x="67.0" y="564.5" font-size="12.5" fill="#1F2328" font-weight="700" text-anchor="middle">5</text>
-<text x="96" y="547" font-size="15.5" fill="#1F2328" font-weight="700">The lock</text>
-<text x="96" y="568" font-size="12.5" fill="#57606A">A key sealed so that only a solution</text>
-<text x="96" y="585" font-size="12.5" fill="#57606A">of those equations opens it.</text>
-<line x1="484" y1="532" x2="484" y2="588" stroke="#E5E1D8"/>
-<rect x="500" y="533" width="82" height="19" rx="9.5" fill="#DDF0FF"/>
-<text x="508" y="547" font-size="11" fill="#0969DA" font-weight="700" letter-spacing="0.8">TOY SIZE</text>
-<text x="500" y="568" font-size="12.5" fill="#1F2328">The real scheme, on small statements.</text>
-<text x="500" y="585" font-size="12.5" fill="#1F2328">Full size, about 8 GB a key piece, does not run.</text>
-<line x1="67" y1="504" x2="67" y2="517" stroke="#57606A" stroke-width="1.6" marker-end="url(#a)"/>
-<circle cx="46" cy="627.5" r="4.5" fill="#1F2328"/>
-<text x="58" y="632" font-size="12.5" fill="#1F2328"><tspan font-weight="700">Stages 2 to 5 are the same for every use.</tspan> A new use needs only a new rule in stage 1.</text>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#505A5F"/></marker></defs>
+<rect width="960" height="668" fill="#FFFFFF"/>
+<text x="40" y="38" font-size="17" fill="#0B0C0C" font-weight="700">Figure 2.B: From a rule to a lock: what is built here</text>
+<line x1="40" y1="51" x2="920" y2="51" stroke="#0B0C0C" stroke-width="1.5"/>
+<text x="40" y="76" font-size="13.5" fill="#505A5F">Every use goes through the same five stages. Only the first is written for each use.</text>
+<text x="96" y="116" font-size="11" fill="#505A5F" font-weight="700" letter-spacing="0.8">STAGE</text>
+<text x="500" y="116" font-size="11" fill="#505A5F" font-weight="700" letter-spacing="0.8">IN THIS REPOSITORY</text>
+<rect x="40" y="128" width="880" height="80" fill="#FFFFFF" stroke="#B1B4B6"/>
+<rect x="56" y="157" width="22" height="22" fill="#F3F2F1"/>
+<text x="67.0" y="172.5" font-size="12.5" fill="#0B0C0C" font-weight="700" text-anchor="middle">1</text>
+<text x="96" y="155" font-size="15.5" fill="#0B0C0C" font-weight="700">The rule</text>
+<text x="96" y="176" font-size="12.5" fill="#505A5F">A program that looks at evidence</text>
+<text x="96" y="193" font-size="12.5" fill="#505A5F">and answers yes or no.</text>
+<line x1="484" y1="140" x2="484" y2="196" stroke="#DADCDD"/>
+<rect x="500" y="141" width="155" height="19" fill="#FFFFFF" stroke="#0B0C0C"/>
+<text x="508" y="155" font-size="11" fill="#0B0C0C" font-weight="700" letter-spacing="0.8">TWO RULES WRITTEN</text>
+<text x="500" y="176" font-size="12.5" fill="#0B0C0C">The bridge's rule and a small time lock,</text>
+<text x="500" y="193" font-size="12.5" fill="#0B0C0C">in plain Python (bridge_sim/).</text>
+<rect x="40" y="226" width="880" height="80" fill="#FFFFFF" stroke="#B1B4B6"/>
+<rect x="56" y="255" width="22" height="22" fill="#F3F2F1"/>
+<text x="67.0" y="270.5" font-size="12.5" fill="#0B0C0C" font-weight="700" text-anchor="middle">2</text>
+<text x="96" y="253" font-size="15.5" fill="#0B0C0C" font-weight="700">Proof of the run</text>
+<text x="96" y="274" font-size="12.5" fill="#505A5F">A zero-knowledge machine proves that</text>
+<text x="96" y="291" font-size="12.5" fill="#505A5F">the program said yes.</text>
+<line x1="484" y1="238" x2="484" y2="294" stroke="#DADCDD"/>
+<rect x="500" y="239" width="90" height="19" fill="#F3F2F1" stroke="#B1B4B6"/>
+<text x="508" y="253" font-size="11" fill="#505A5F" font-weight="700" letter-spacing="0.8">NOT CODED</text>
+<text x="500" y="274" font-size="12.5" fill="#0B0C0C">The paper uses an existing machine.</text>
+<text x="500" y="291" font-size="12.5" fill="#0B0C0C">A rule would be rewritten for it.</text>
+<line x1="67" y1="210" x2="67" y2="223" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="40" y="324" width="880" height="80" fill="#FFFFFF" stroke="#B1B4B6"/>
+<rect x="56" y="353" width="22" height="22" fill="#F3F2F1"/>
+<text x="67.0" y="368.5" font-size="12.5" fill="#0B0C0C" font-weight="700" text-anchor="middle">3</text>
+<text x="96" y="351" font-size="15.5" fill="#0B0C0C" font-weight="700">One small proof</text>
+<text x="96" y="372" font-size="12.5" fill="#505A5F">That proof is wrapped into a single</text>
+<text x="96" y="389" font-size="12.5" fill="#505A5F">Groth16 proof of fixed size.</text>
+<line x1="484" y1="336" x2="484" y2="392" stroke="#DADCDD"/>
+<rect x="500" y="337" width="82" height="19" fill="#FFFFFF" stroke="#0B0C0C"/>
+<text x="508" y="351" font-size="11" fill="#0B0C0C" font-weight="700" letter-spacing="0.8">TOY SIZE</text>
+<text x="500" y="372" font-size="12.5" fill="#0B0C0C">A small Groth16 system that makes real</text>
+<text x="500" y="389" font-size="12.5" fill="#0B0C0C">test proofs (encoding/groth16.py).</text>
+<line x1="67" y1="308" x2="67" y2="321" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="40" y="422" width="880" height="80" fill="#FFFFFF" stroke="#B1B4B6"/>
+<rect x="56" y="451" width="22" height="22" fill="#F3F2F1"/>
+<text x="67.0" y="466.5" font-size="12.5" fill="#0B0C0C" font-weight="700" text-anchor="middle">4</text>
+<text x="96" y="449" font-size="15.5" fill="#0B0C0C" font-weight="700">Proof checker as lock gates</text>
+<text x="96" y="470" font-size="12.5" fill="#505A5F">“This proof is valid”, rewritten as</text>
+<text x="96" y="487" font-size="12.5" fill="#505A5F">equations over bits.</text>
+<line x1="484" y1="434" x2="484" y2="490" stroke="#DADCDD"/>
+<rect x="500" y="435" width="147" height="19" fill="#FFFFFF" stroke="#8F1D2C"/>
+<text x="508" y="449" font-size="11" fill="#8F1D2C" font-weight="700" letter-spacing="0.8">BUILT, WITH GAPS</text>
+<text x="500" y="470" font-size="12.5" fill="#0B0C0C">Checks real proofs, at 1.4× the size the</text>
+<text x="500" y="487" font-size="12.5" fill="#0B0C0C">paper reports (praxis_lock/encoding/).</text>
+<line x1="67" y1="406" x2="67" y2="419" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="40" y="520" width="880" height="80" fill="#FFFFFF" stroke="#B1B4B6"/>
+<rect x="56" y="549" width="22" height="22" fill="#F3F2F1"/>
+<text x="67.0" y="564.5" font-size="12.5" fill="#0B0C0C" font-weight="700" text-anchor="middle">5</text>
+<text x="96" y="547" font-size="15.5" fill="#0B0C0C" font-weight="700">The lock</text>
+<text x="96" y="568" font-size="12.5" fill="#505A5F">A key sealed so that only a solution</text>
+<text x="96" y="585" font-size="12.5" fill="#505A5F">of those equations opens it.</text>
+<line x1="484" y1="532" x2="484" y2="588" stroke="#DADCDD"/>
+<rect x="500" y="533" width="82" height="19" fill="#FFFFFF" stroke="#0B0C0C"/>
+<text x="508" y="547" font-size="11" fill="#0B0C0C" font-weight="700" letter-spacing="0.8">TOY SIZE</text>
+<text x="500" y="568" font-size="12.5" fill="#0B0C0C">The real scheme, on small statements.</text>
+<text x="500" y="585" font-size="12.5" fill="#0B0C0C">Full size, about 8 GB a key piece, does not run.</text>
+<line x1="67" y1="504" x2="67" y2="517" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="40" y1="614" x2="920" y2="614" stroke="#B1B4B6" stroke-width="1"/>
+<text x="40" y="634" font-size="12.5" fill="#0B0C0C"><tspan font-weight="700">Stages 2 to 5 are the same for every use.</tspan> A new use needs only a new rule in stage 1.</text>
+<text x="40" y="653" font-size="11.5" fill="#505A5F">Source: Bitcoin Witness Bridge Simulator; the five stages follow the design in the Praxis paper (ePrint 2026/2971).</text>
 </svg>
