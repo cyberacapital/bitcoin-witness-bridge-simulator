@@ -24,7 +24,7 @@ from py_ecc import optimized_bn128 as ob
 
 from ..field import Q as R, interpolate, inv, pdivmod, peval, pmul, padd, psub, pscale
 from .circuit import Circuit
-from .pairing import (alloc_g1, alloc_g2, assert_pairing_compact, assert_pairing_folded,
+from .pairing import (alloc_g1, alloc_g2, assert_pairing_bundled, assert_pairing_compact, assert_pairing_folded,
                       assert_pairing_identity, const_g2, miller_product, miller_value)
 
 
@@ -135,11 +135,11 @@ def verify(vk: VerifyingKey, public, proof) -> bool:
     return ob.final_exponentiate(product) == ob.FQ12.one()
 
 
-CHECKS = ("rescaled", "compact", "folded", "root")
+CHECKS = ("bundled", "rescaled", "compact", "folded", "root")
 
 
 def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
-                    style: str = "wide", check: str = "rescaled") -> Circuit:
+                    style: str = "wide", check: str = "bundled") -> Circuit:
     """The Groth16 verifier as gates over bits, built with `proof` as the assignment.
 
     The unknown bits are the proof's coordinates plus every intermediate value
@@ -162,6 +162,9 @@ def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
                  the two lines of each step merged, and a signed loop
       "rescaled" compact, with the moving G2 point followed without its
                  y-coordinate and without separate line values
+      "bundled"  rescaled, with the running product kept in two forms so that
+                 a line needs no stored value of its own, and the fixed
+                 pairing's lines entering a few steps at a time
 
     The defaults give the smallest statement.
     """
@@ -175,7 +178,10 @@ def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
     L = public_point(vk, public)
     numer = miller_value(vk.gamma_g2, bn.neg(L))
     denom = miller_value(vk.beta_g2, vk.alpha_g1)
-    if check in ("compact", "rescaled"):
+    if check == "bundled":
+        assert_pairing_bundled(c, pairs[0], pairs[1], numer, denom)
+        c.mark("the two pairings that involve the proof and the final check, in one loop")
+    elif check in ("compact", "rescaled"):
         assert_pairing_compact(c, pairs[0], pairs[1], numer, denom, rescale=check == "rescaled")
         c.mark("the two pairings that involve the proof and the final check, in one loop")
     elif check == "folded":

@@ -446,6 +446,99 @@ class TowerAndPairing(unittest.TestCase):
         self.assertNotEqual(signed, binary)
         self.assertEqual(pg.torus_class(signed), pg.torus_class(binary))
 
+    def test_the_two_forms_of_a_running_value_and_the_rules_between_them(self):
+        """Up to factors from F_p^6, an element a + b w is kept as G = l0 a/b
+        (form A) or h = l0 b/a (form B). Each rule's new value must be the form
+        of the true product, its gate must accept it, and must refuse another."""
+        from py_ecc import bn128 as bn
+        from praxis_lock.encoding import pairing as pg
+        rng = random.Random(12)
+        x, y = (bn.FQ12([rng.randrange(P) for _ in range(12)]) for _ in range(2))
+        plain_l0, imaginary_l0 = bn.FQ2([rng.randrange(1, P), 0]), bn.FQ2([0, rng.randrange(1, P)])
+        rules = ["square of A", "square of B", "A times B", "B times B", "A times A",
+                 "class from A", "class from B", "form A of a class"]
+
+        def run(l0_v, style, tamper=None):
+            c = Circuit(style=style)
+            c.tamper = tamper
+            forms = pg._Forms(c, fq2_alloc(c, pg.ints(l0_v)), l0_v)
+            unit = pg._embed_value(l0_v)
+            ratio = lambda top, bottom: pg.fq12_mul(pg.fq12_mul(unit, top), pg.fq6_inverse(bottom))
+            form_a = lambda z: ratio(*pg._split(z))
+            form_b = lambda z: ratio(*pg._split(z)[::-1])
+            bits = lambda v: pg._fq6_alloc(c, v)
+            xa, xb, ya, yb, cls = form_a(x), form_b(x), form_a(y), form_b(y), pg.torus_class(x)
+            got = [forms.square(bits(xa), xa, "A", rules[0])[1],
+                   forms.square(bits(xb), xb, "B", rules[1])[1],
+                   forms.a_times_b(bits(xa), xa, bits(yb), yb, rules[2])[1],
+                   forms.b_times_b(bits(xb), xb, bits(yb), yb, rules[3])[1],
+                   forms.a_times_a(bits(xa), xa, bits(ya), ya, rules[4])[1],
+                   forms.plain(bits(xa), xa, "A", rules[5])[1],
+                   forms.plain(bits(xb), xb, "B", rules[6])[1],
+                   forms.scaled(bits(cls), cls, rules[7])[1]]
+            want = [form_a(x * x), form_a(x * x), form_b(x * y), form_a(x * y), form_a(x * y), cls, cls, xa]
+            # A running value in either form, times a value in either form, lands in the form reported.
+            for form, v in (("A", xa), ("B", xb)):
+                for other, w, times in (("A", ya, forms.times_a), ("B", yb, forms.times_b)):
+                    _, value, landed = times(bits(v), v, form, bits(w), w, "either form")
+                    got.append(value)
+                    want.append({"A": form_a, "B": form_b}[landed](x * y))
+            # The inverse of an element has the negative form-A value: that is how a digit -1 is handled.
+            got.append(form_a(bn.FQ12.one() / x))
+            want.append(bn.FQ12.zero() - xa)
+            return c, got, want
+
+        for l0_v in (plain_l0, imaginary_l0):
+            for style in STYLES:
+                c, got, want = run(l0_v, style)
+                self.assertEqual(got, want)
+                self.assertTrue(c.satisfied, c.failures[:3])
+                for label in rules:
+                    bump = lambda l, n, v, label=label: v + type(v).one() if l == label else v
+                    self.assertEqual(set(run(l0_v, style, bump)[0].failures), {label})
+        # The constant term's square must be a plain number; one that is not is refused.
+        c = Circuit()
+        mixed = bn.FQ2([3, 5])
+        pg._Forms(c, fq2_alloc(c, pg.ints(mixed)), mixed)
+        self.assertEqual(set(c.failures), {"bundled: constant term squared"})
+
+    def test_bundles_of_fixed_lines_are_the_products_they_stand_for(self):
+        """The fixed pairing's lines enter a few steps at a time, as fixed
+        polynomials in two numbers of its G1 point. Put together again, with the
+        squarings in between, they must give that pairing's Miller value."""
+        from py_ecc import bn128 as bn
+        from praxis_lock.encoding import pairing as pg
+        D, C = bn.multiply(bn.G2, 11), bn.multiply(bn.G1, 13)
+        eta = pow(int(C[1]), -1, P)
+        rho = int(C[0]) * eta % P
+        self.assertEqual(pow(rho, 3, P), (eta - 3 * pow(eta, 3, P)) % P)     # the curve, in these two numbers
+        key = (tuple(pg.ints(D[0])), tuple(pg.ints(D[1])))
+        for loop, max_degree in ((tuple(pg.SIGNED_LOOP), pg.BUNDLE_DEGREE), ((0, 1, 0), 4), ((1, -1), 4),
+                                 ((1, -1), 30), ((0, 0, -1, 0, 1), 6)):
+            plan = pg.bundle_plan(loop, max_degree)
+            self.assertEqual([k for steps, _ in plan for k in steps], list(range(len(loop))))
+            bundles = pg._bundles(key, loop, max_degree)
+            self.assertEqual([last for last, _ in bundles], [steps[-1] for steps, _ in plan])
+            total = bn.FQ12.one()
+            for (steps, degree), (_, poly) in zip(plan, bundles):
+                self.assertLessEqual(degree, max_degree)
+                self.assertLessEqual(max(b + e for b, e in poly), degree)
+                self.assertLessEqual(max(b for b, _ in poly), 2)
+                pg._split_bundle(poly)                               # even part in F_p^6, odd part in F_p^6 w
+                value = bn.FQ12.zero()
+                for (b, e), coefs in poly.items():
+                    value = value + bn.FQ12(coefs) * (pow(rho, b, P) * pow(eta, e, P) % P)
+                for _ in steps:
+                    total = pg.fq12_mul(total, total)
+                total = pg.fq12_mul(total, value)
+            self.assertEqual(pg.torus_class(total), pg.torus_class(pg.miller_value(D, C, loop)))
+        full = pg.bundle_plan(pg.SIGNED_LOOP)
+        self.assertEqual((len(full), max(degree for _, degree in full)), (17, 23))
+        with self.assertRaises(ValueError):
+            pg._split_bundle({(0, 0): (0, 1) + (0,) * 10})
+        with self.assertRaises(ValueError):
+            pg._split_bundle({(1, 0): (1,) + (0,) * 11})
+
     def test_the_prover_finds_a_root_exactly_when_the_pairing_product_is_one(self):
         from py_ecc import bn128 as bn
         from praxis_lock.encoding import pairing as pg
@@ -481,8 +574,10 @@ class EveryCheckIsNeeded(unittest.TestCase):
 
     # Helper values with no gate of their own name: the last equation catches them.
     CAUGHT_BY = {"root": "pairing equation", "fold: root": "pairing equation",
-                 "fold: choice": "pairing equation", "compact: root": "pairing equation"}
+                 "fold: choice": "pairing equation", "compact: root": "pairing equation",
+                 "bundled: root": "pairing equation"}
     COMPACT_LOOP = [1, -1]              # two doublings, one addition of each sign
+    OTHER_LOOP = [0, 1, 0]              # three doublings, one addition: the remaining cases of the bundled check
 
     @classmethod
     def setUpClass(cls):
@@ -554,6 +649,27 @@ class EveryCheckIsNeeded(unittest.TestCase):
                                   witness=(self.fold_root, 0), rescale=rescale)
         return c
 
+    def bundled(self, tamper=None, materialize=False, style="narrow", loop=None, max_degree=4, shift=0,
+                A=None, off=False):
+        """A short signed loop with the bundled check, two bundles of fixed lines.
+        `shift` multiplies the right-hand constant by a power of omega, which must make no
+        difference; `off` multiplies it by something that must."""
+        bn, pg = self.bn, self.pg
+        loop = self.COMPACT_LOOP if loop is None else loop
+        A = self.A if A is None else A
+        miller = pg.miller_value(self.B, A, loop) * pg.miller_value(self.D, bn.neg(self.C), loop)
+        exponent = pg.signed_count(loop) + P - P**2 + P**3
+        denom = miller * self.numer * pg.fold_numbers()["powers"][shift] / pg.fq12_pow(self.fold_root, exponent)
+        if off:
+            denom = denom * pg.miller_value(bn.G2, bn.G1, "1")
+        c = Circuit(materialize=materialize, style=style)
+        c.tamper = tamper
+        moving = (pg.alloc_g2(c, self.B), pg.alloc_g1(c, A))
+        fixed = (pg.const_g2(c, self.D), pg.alloc_g1(c, self.C).neg())
+        pg.assert_pairing_bundled(c, moving, fixed, self.numer, denom, loop, witness=(self.fold_root, 0),
+                                  max_degree=max_degree)
+        return c
+
     @staticmethod
     def wrong(label, occurrence):
         def bump(v):
@@ -605,6 +721,15 @@ class EveryCheckIsNeeded(unittest.TestCase):
                        "rescaled: on the line", "rescaled: one over x", "rescaled: point x",
                        "rescaled: point y", "rescaled: root of that", "rescaled: tangent",
                        "rescaled: through the other point"]
+    BUNDLED_LABELS = ["Frobenius x", "Frobenius y", "Frobenius^2 x", "Frobenius^2 y", "G1: x squared",
+                      "G2: x squared", "bundled: class", "bundled: constant term squared",
+                      "bundled: fixed lines", "bundled: fixed lines in", "bundled: line", "bundled: power",
+                      "bundled: root", "bundled: root in", "bundled: root, scaled", "bundled: square",
+                      "compact: Frobenius 1 product", "compact: Frobenius 2 product", "compact: one over y",
+                      "compact: x over y", "rescaled: constant term", "rescaled: new x",
+                      "rescaled: on the line", "rescaled: one over x", "rescaled: point x",
+                      "rescaled: point y", "rescaled: root of that", "rescaled: tangent",
+                      "rescaled: through the other point"]
     FOLD_LABELS = ["Miller: fold", "Miller: square", "fold: Frobenius 1", "fold: Frobenius 2",
                    "fold: Frobenius 3", "fold: choice", "fold: first product", "fold: inverse",
                    "fold: one choice", "fold: root", "fold: second product"]
@@ -650,6 +775,54 @@ class EveryCheckIsNeeded(unittest.TestCase):
         self.assertEqual(tried, 56)
         self.assertTrue(self.compact(style="narrow", rescale=True).satisfied)
 
+    def test_every_helper_value_in_the_bundled_check_is_checked(self):
+        """Two short loops. Between them the running value is squared, multiplied by a line,
+        by the root and by a bundle of fixed lines in each of its two forms."""
+        for loop in (self.COMPACT_LOOP, self.OTHER_LOOP):
+            tried = self.sweep(lambda tamper: self.bundled(tamper, style="wide", loop=loop), self.BUNDLED_LABELS)
+            self.assertEqual(tried, 64)
+            self.assertTrue(self.bundled(style="narrow", loop=loop).satisfied)
+        # The narrow layout stores each constant multiple inside a bundle as well; sweep some of those.
+        tried = self.sweep(lambda tamper: self.bundled(tamper, style="narrow"),
+                           self.BUNDLED_LABELS + self.NARROW_ONLY, only=self.NARROW_ONLY,
+                           every={"compact: constant multiple": 8})
+        self.assertEqual(tried, 7)
+
+    def test_the_bundled_check_does_not_depend_on_how_the_fixed_lines_are_bundled(self):
+        """One bundle or two, a true claim passes and a false one fails at the last equation only.
+        Multiplying the right-hand constant by a power of omega changes nothing."""
+        prints = set()
+        for max_degree in (4, 30):
+            for shift in (0, 1, 5):
+                c = self.bundled(style="wide", max_degree=max_degree, shift=shift)
+                self.assertTrue(c.satisfied, c.failures[:3])
+                prints.add((max_degree, c.fingerprint()))
+            for loop in (self.COMPACT_LOOP, self.OTHER_LOOP):
+                c = self.bundled(style="wide", loop=loop, max_degree=max_degree, off=True)
+                self.assertEqual(set(c.failures), {"pairing equation"})
+        self.assertEqual(len(prints), 2)                # one statement per way of bundling
+        pg = self.pg
+        self.assertEqual([len(pg.bundle_plan(self.COMPACT_LOOP, d)) for d in (4, 30)], [2, 1])
+
+    def test_the_bundled_check_wants_one_point_of_bits_and_one_constant(self):
+        pg = self.pg
+        c = Circuit()
+        moving, fixed = self.pairs(c)
+        for pair in ((moving, moving), (fixed, fixed), (fixed, moving)):
+            with self.assertRaises(ValueError):
+                pg.assert_pairing_bundled(c, pair[0], pair[1], self.numer, self.denom, self.COMPACT_LOOP,
+                                          witness=(self.fold_root, 0))
+
+    def test_no_bit_of_a_bundled_pairing_computation_is_left_free(self):
+        c = self.bundled(materialize=True, loop=self.OTHER_LOOP)
+        self.assertTrue(c.satisfied, c.failures[:3])
+        self.assertGreater(c.n_bits, 200_000)
+        self.assertTrue(holds(c.gates, c.x))
+        self.assertEqual(bits_free_to_flip(c.gates, c.x), [])
+        c = self.bundled(self.wrong("bundled: fixed lines", 1), materialize=True, loop=self.OTHER_LOOP)
+        self.assertFalse(c.satisfied)
+        self.assertFalse(holds(c.gates, c.x))
+
     def test_the_y_free_moving_point_works_for_either_kind_of_square_root(self):
         """The rescaling needs a square root of 1 / x_A. It lies in F_p for some
         proofs and only in F_p^2 for others; the same gates must serve both."""
@@ -672,6 +845,10 @@ class EveryCheckIsNeeded(unittest.TestCase):
             pg.assert_pairing_compact(c, moving, fixed, self.numer, denom, self.COMPACT_LOOP,
                                       witness=(self.fold_root, 0), rescale=True)
             self.assertTrue(c.satisfied, (kind, c.failures[:3]))
+            # The bundled check squares the line's constant term, which is plain or purely imaginary.
+            for loop in (self.COMPACT_LOOP, self.OTHER_LOOP):
+                c = self.bundled(style="wide", loop=loop, A=A)
+                self.assertTrue(c.satisfied, (kind, c.failures[:3]))
         self.assertEqual(kinds, {"plain", "imaginary"})
 
     def test_no_bit_of_the_y_free_computation_is_left_free(self):
@@ -802,8 +979,8 @@ class Groth16Verifier(unittest.TestCase):
         self.assertTrue(c.satisfied, c.failures[:3])
         self.assertEqual((c.style, c.max_products), ("wide", 3048))
         # Sizes, pinned so that changes to the encoding are noticed.
-        self.assertTrue(610_000 < c.n_bits < 650_000, c.n_bits)
-        self.assertTrue(4_280 < c.n_gates < 4_340, c.n_gates)
+        self.assertTrue(540_000 < c.n_bits < 572_000, c.n_bits)
+        self.assertTrue(3_790 < c.n_gates < 3_840, c.n_gates)
 
     def test_a_fresh_proof_of_the_same_statement_also_satisfies_them(self):
         other = self.g.prove(self.r1cs, self.trapdoor, [1, 47053, 223, 211, 223 * 223])
@@ -839,10 +1016,12 @@ class Groth16Verifier(unittest.TestCase):
         g, (A, B, C) = self.g, self.proof
         forged = (A, B, bn.multiply(bn.G1, 12345))
         expected = {                      # (style, check): bits, gates, most products in a gate
+            ("wide", "rescaled"): ((610_000, 650_000), (4_280, 4_340), 3048),
             ("wide", "compact"): ((700_000, 745_000), (4_940, 5_000), 3048),
             ("wide", "folded"): ((1_400_000, 1_460_000), (9_900, 9_980), 3048),
             ("wide", "root"): ((2_480_000, 2_550_000), (17_300, 17_400), 3048),
             ("narrow", "rescaled"): ((2_950_000, 3_100_000), (18_200, 18_350), 99),
+            ("narrow", "bundled"): ((3_300_000, 3_500_000), (20_200, 20_450), 483),
             ("narrow", "folded"): ((4_750_000, 4_850_000), (29_250, 29_450), 69),
             ("narrow", "root"): ((8_450_000, 8_580_000), (51_500, 51_750), 69),
         }

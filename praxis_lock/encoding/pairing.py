@@ -17,9 +17,10 @@ Two changes keep the size down:
     in the pairing loop's own squarings and the other three parts are
     Frobenius maps, which are linear, so the 353 steps shrink to about 40.
     This is the residue method of Novakovic and Eagen, "On Proving Pairings",
-    worked out again here for these gates. A third form, the compact one
-    (`assert_pairing_compact`), builds on the folded one and is described
-    where it is defined, near the end of this file.
+    worked out again here for these gates. Two further forms, the compact one
+    (`assert_pairing_compact`) and the bundled one (`assert_pairing_bundled`),
+    build on the folded one and are described where they are defined, near
+    the end of this file.
 
 Every division is replaced by a hint and a multiplication: the prover supplies
 the slope m and the gates check m * denominator = numerator.
@@ -841,6 +842,18 @@ class _Rescaled:
         return self._advance(mu, nu, nx, mu_v, nu_v, nx_v)
 
 
+def _compact_tail(c: Circuit, g, g_val, start, start_val, numer: "FQ12", denom: "FQ12") -> None:
+    """The end of the compact check. c^(-lambda) still lacks (1/c)^p * c^(p^2) * (1/c)^(p^3):
+    three linear images of the root's class. Then the result must be the class of denom / numer."""
+    for e, sign, label in ((1, 1, "compact: Frobenius 1"), (2, -1, "compact: Frobenius 2")):
+        image, image_val = _t_frobenius(c, start, start_val, e, sign, label)
+        g, g_val = _t_mul(c, g, g_val, image, image_val, label + " product")
+    image, _ = _t_frobenius(c, start, start_val, 3, 1, "compact: Frobenius 3")
+    target = fq12_const(c, ints(torus_class(denom / numer)))
+    fq12_assert(c, [(1, target, g), (1, target, image), (-1, g, image)],
+                [(-1, fq12_const(c, ints(_V)))], label="pairing equation")
+
+
 def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ12",
                            loop=SIGNED_LOOP, witness=None, rescale: bool = False) -> None:
     """Assert that  Miller(moving) * Miller(fixed) * numer / denom  becomes 1 under the
@@ -957,11 +970,334 @@ def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ1
     m, t, _ = _fixed_add(Rf, f2)
     g, g_val = step(g, g_val, line, lv, m, t)
 
-    # c^(-lambda) still lacks (1/c)^p * c^(p^2) * (1/c)^(p^3): three linear images of the first class.
-    for e, sign, label in ((1, 1, "compact: Frobenius 1"), (2, -1, "compact: Frobenius 2")):
-        image, image_val = _t_frobenius(c, start, start_val, e, sign, label)
-        g, g_val = _t_mul(c, g, g_val, image, image_val, label + " product")
-    image, _ = _t_frobenius(c, start, start_val, 3, 1, "compact: Frobenius 3")
-    target = fq12_const(c, ints(torus_class(denom / numer)))
-    fq12_assert(c, [(1, target, g), (1, target, image), (-1, g, image)],
-                [(-1, fq12_const(c, ints(_V)))], label="pairing equation")
+    _compact_tail(c, g, g_val, start, start_val, numer, denom)
+
+
+# ---------------------------------------------------------------- the bundled check
+#
+# The rescaled compact check stores three values of six numbers for every loop
+# step: the running class squared, the class of the step's two lines, and their
+# product. Two changes bring that down.
+#
+# Two forms. Let l0 be the constant term of the moving pairing's line, an F_p^2
+# number stored once. Up to factors from F_p^6, an element is kept in one of
+#
+#     form A:  G + l0 w          form B:  l0 + h w          (G, h in F_p^6)
+#
+# The moving line is l0 + a w with `a` made of stored numbers, so it is in
+# form B as it stands and nothing is stored for it. With L = l0^2:
+#
+#     square of A:   G' * 2G        = G^2 + L v        gives form A
+#     square of B:   G' * 2h        = L + h^2 v        gives form A
+#     A times B:     h' * (G + h v) = G h + L          gives form B
+#     B times B:     G' * (h1 + h2) = L + h1 h2 v      gives form A
+#     A times A:     G' * (G1 + G2) = G1 G2 + L v      gives form A
+#
+# Each equation has degree two. Each ties down its new value: the factor next
+# to it cannot be zero while the equation holds, because v is not a square in
+# F_p^6 and l0 is not zero. So a doubling step is "square, then times the
+# line", two stored values where there were three.
+#
+# Bundled fixed lines. The other pairing's line, divided by -y of its G1 point
+# C, is  1 + (A rho + B eta) w  with rho = x_C / y_C and eta = 1 / y_C stored
+# once and A, B constants. Over a few steps in a row these lines, with the
+# powers of two they pick up from the squarings in between, multiply to a
+# fixed polynomial in rho and eta. C lies on the curve, so rho^3 = eta - 3 eta^3
+# and a polynomial of degree d needs only the 3d monomials rho^b eta^c with
+# b <= 2, which are stored once. A bundle is then N + M w with N and M fixed
+# combinations of stored numbers; its form-A value G, with  G * M = l0 * N,
+# is stored and enters the running value by one of the rules above. That is
+# two stored values per bundle where there was one per step.
+#
+# At the end the running value is turned back into a plain class (g l0 = G, or
+# g h = l0) and the compact check's closing lines finish the job.
+
+BUNDLE_DEGREE = 23       # the largest degree of a bundle; 17 bundles for the full loop
+
+
+def bundle_plan(loop, max_degree: int = BUNDLE_DEGREE):
+    """Split the loop's steps into runs whose fixed lines form one bundle each.
+
+    Each step brings one fixed line, two if it has an addition; the last step
+    also takes the two closing lines. A line that enters j steps before the end
+    of its run is squared j times, so it adds 2^j to the bundle's degree. Runs
+    are grown greedily while the degree stays within `max_degree`.
+    Returns a list of (steps, degree).
+    """
+    runs, steps, degree = [], [], 0
+    for k, d in enumerate(loop):
+        lines = 1 + (1 if d else 0) + (2 if k == len(loop) - 1 else 0)
+        if steps and 2 * degree + lines > max_degree:
+            runs.append((steps, degree))
+            steps, degree = [], 0
+        degree = 2 * degree + lines
+        steps.append(k)
+    runs.append((steps, degree))
+    return runs
+
+
+def _poly_times(a: dict, b: dict) -> dict:
+    """Product of two polynomials in rho and eta whose coefficients are packed
+    elements of F_p^12, reduced with rho^3 = eta - 3 eta^3."""
+    acc = {}
+
+    def put(key, z, k):
+        row = acc.get(key)
+        if row is None:
+            row = acc[key] = [0] * 12
+        for i in range(12):
+            row[i] += k * ((z >> (_SLOT * i)) & _SLOT_MASK)
+
+    for (b1, c1), x in a.items():
+        for (b2, c2), y in b.items():
+            z = _mul_packed(x, y)
+            eb, ec = b1 + b2, c1 + c2
+            if eb < 3:
+                put((eb, ec), z, 1)
+            else:
+                put((eb - 3, ec + 1), z, 1)
+                put((eb - 3, ec + 3), z, -3)
+    return {key: _pack(v % P for v in row) for key, row in acc.items() if any(v % P for v in row)}
+
+
+def _fixed_line_poly(m: "FQ2", t: "FQ2") -> dict:
+    """The fixed line with slope m and intercept t, over -y of its G1 point:
+    1 - E(m) rho w - E(t) eta w^3, as a polynomial in rho and eta."""
+    (m0, m1), (t0, t1) = ints(m), ints(t)
+    by_rho, by_eta = [0] * 12, [0] * 12
+    by_rho[1], by_rho[7] = -(m0 - 9 * m1) % P, -m1 % P
+    by_eta[3], by_eta[9] = -(t0 - 9 * t1) % P, -t1 % P
+    return {(0, 0): 1, (1, 0): _pack(by_rho), (0, 1): _pack(by_eta)}
+
+
+@functools.lru_cache(maxsize=8)
+def _bundles(qf, loop, max_degree: int):
+    """The bundles of fixed lines for a fixed G2 point, as polynomials in rho and eta.
+
+    Depends only on the fixed point and the loop, never on a proof. Returns a
+    list of (last step, {(b, c): twelve coefficients}) for the monomials rho^b eta^c.
+    """
+    conj = lambda v: FQ2([int(v.coeffs[0]), (-int(v.coeffs[1])) % P])
+    qx, qy = FQ2(list(qf[0])), FQ2(list(qf[1]))
+    R, lines = (qx, qy), []
+    for d in loop:
+        m, t, R = _fixed_double(R)
+        here = [_fixed_line_poly(m, t)]
+        if d:
+            m, t, R = _fixed_add(R, (qx, qy * d))
+            here.append(_fixed_line_poly(m, t))
+        lines.append(here)
+    m, t, R = _fixed_add(R, (conj(qx) * FROB_X, conj(qy) * FROB_Y))
+    lines[-1].append(_fixed_line_poly(m, t))
+    m, t, _ = _fixed_add(R, (qx * FROB2_X, -(qy * FROB2_Y)))
+    lines[-1].append(_fixed_line_poly(m, t))
+
+    out = []
+    for steps, degree in bundle_plan(loop, max_degree):
+        poly = {(0, 0): 1}
+        for k in steps:
+            poly = _poly_times(poly, poly)
+            for line in lines[k]:
+                poly = _poly_times(poly, line)
+        assert max(b + c for b, c in poly) <= degree
+        out.append((steps[-1], {key: tuple((v >> (_SLOT * i)) & _SLOT_MASK for i in range(12))
+                                for key, v in poly.items()}))
+    return out
+
+
+def _split_bundle(poly: dict):
+    """A bundle as N + M w: for each monomial, its six coefficients in N (even degree) or in M (odd).
+
+    A product of k line terms is an element of F_p^6 times w^k, so monomials of
+    even degree have coefficients in F_p^6 and those of odd degree in F_p^6 w.
+    Anything else is refused.
+    """
+    even, odd = {}, {}
+    for key, coefs in poly.items():
+        shift = (key[0] + key[1]) % 2
+        if any(coefs[1 - shift::2]):
+            raise ValueError("not a product of lines: a coefficient on the wrong side")
+        (odd if shift else even)[key] = tuple(coefs[shift::2])
+    return even, odd
+
+
+def _embed_value(v: "FQ2") -> "FQ12":
+    a0, a1 = ints(v)
+    return FQ12([(a0 - 9 * a1) % P, 0, 0, 0, 0, 0, a1, 0, 0, 0, 0, 0])
+
+
+class _Forms:
+    """The two forms of a running value and the five rules between them (see above)."""
+
+    def __init__(self, c: Circuit, l0, l0_v: "FQ2"):
+        self.c = c
+        self.l0 = [ZERO] * 12
+        self.l0[0], self.l0[6] = l0[0] - l0[1].scale(9), l0[1]
+        self.l0_v = _embed_value(l0_v)
+        # L = l0^2. The root alpha is a plain or a purely imaginary number, so L lies in F_p.
+        square_v = c.hint("bundled: constant term squared", int((l0_v * l0_v).coeffs[0]))
+        square = fp_alloc(c, square_v)
+        fq2_assert(c, [(1, l0, l0)], [(-1, (square, ZERO))], label="bundled: constant term squared")
+        self.L = [square] + [ZERO] * 11
+        self.L_v = FQ12([square_v % P] + [0] * 11)
+        self.Lv = _times_v(self.L)
+        self.Lv_v = fq12_mul(self.L_v, _V)
+
+    def _new(self, label: str, top: "FQ12", bottom: "FQ12"):
+        value = self.c.hint(label, fq12_mul(top, fq6_inverse(bottom)))
+        return _fq6_alloc(self.c, value), value
+
+    def square(self, x, xv, form: str, label: str):
+        """The square of a value in either form, in form A."""
+        if form == "A":
+            out, value = self._new(label, fq12_mul(xv, xv) + self.Lv_v, xv + xv)
+            fq12_assert(self.c, [(2, out, x), (-1, x, x)], [(-1, self.Lv)], label=label)
+        else:
+            out, value = self._new(label, self.L_v + fq12_mul(fq12_mul(xv, xv), _V), xv + xv)
+            fq12_assert(self.c, [(2, out, x), (-1, _times_v(x), x)], [(-1, self.L)], label=label)
+        return out, value
+
+    def a_times_b(self, g, gv, h, hv, label: str):
+        """Form A times form B, in form B."""
+        out, value = self._new(label, fq12_mul(gv, hv) + self.L_v, gv + fq12_mul(hv, _V))
+        fq12_assert(self.c, [(1, out, g), (1, out, _times_v(h)), (-1, h, g)], [(-1, self.L)], label=label)
+        return out, value
+
+    def b_times_b(self, h1, h1v, h2, h2v, label: str):
+        """Form B times form B, in form A."""
+        out, value = self._new(label, self.L_v + fq12_mul(fq12_mul(h1v, h2v), _V), h1v + h2v)
+        fq12_assert(self.c, [(1, out, h1), (1, out, h2), (-1, _times_v(h1), h2)], [(-1, self.L)],
+                    label=label)
+        return out, value
+
+    def a_times_a(self, g1, g1v, g2, g2v, label: str):
+        """Form A times form A, in form A."""
+        out, value = self._new(label, fq12_mul(g1v, g2v) + self.Lv_v, g1v + g2v)
+        fq12_assert(self.c, [(1, out, g1), (1, out, g2), (-1, g1, g2)], [(-1, self.Lv)], label=label)
+        return out, value
+
+    def times_b(self, x, xv, form: str, h, hv, label: str):
+        """A running value in either form times a form-B value. Returns (bits, value, form)."""
+        if form == "A":
+            return self.a_times_b(x, xv, h, hv, label) + ("B",)
+        return self.b_times_b(x, xv, h, hv, label) + ("A",)
+
+    def times_a(self, x, xv, form: str, g, gv, label: str):
+        """A running value in either form times a form-A value. Returns (bits, value, form)."""
+        if form == "A":
+            return self.a_times_a(x, xv, g, gv, label) + ("A",)
+        return self.a_times_b(g, gv, x, xv, label) + ("B",)
+
+    def scaled(self, g, gv, label: str):
+        """The form-A value of a plain class g: G = l0 g."""
+        value = self.c.hint(label, fq12_mul(self.l0_v, gv))
+        out = _fq6_alloc(self.c, value)
+        fq12_assert(self.c, [(1, self.l0, g)], [(-1, out)], label=label)
+        return out, value
+
+    def plain(self, x, xv, form: str, label: str):
+        """The plain class a/b of a running value: g l0 = G in form A, g h = l0 in form B."""
+        if form == "A":
+            out, value = self._new(label, xv, self.l0_v)
+            fq12_assert(self.c, [(1, self.l0, out)], [(-1, x)], label=label)
+        else:
+            out, value = self._new(label, self.l0_v, xv)
+            fq12_assert(self.c, [(1, out, x)], [(-1, self.l0)], label=label)
+        return out, value
+
+
+def assert_pairing_bundled(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ12",
+                           loop=SIGNED_LOOP, witness=None, max_degree: int = BUNDLE_DEGREE) -> None:
+    """Assert the same thing as `assert_pairing_compact` with `rescale`, storing less.
+
+    The running value is kept in two forms so that the moving line needs no
+    stored class of its own, and the fixed pairing's lines enter in bundles of
+    a few steps (see the comment above). `max_degree` bounds the size of a
+    bundle; `loop` and `witness` are for small test instances.
+    """
+    (Q, Pt), (Qf, Ptf) = moving, fixed
+    if Q.const or not Qf.const:
+        raise ValueError("the bundled check takes one G2 point made of bits and one constant")
+    loop = tuple(loop)
+    if witness is None:
+        product = fq12_mul(miller_value((Q.xv, Q.yv), (Pt.xv, Pt.yv), loop),
+                           miller_value((Qf.xv, Qf.yv), (Ptf.xv, Ptf.yv), loop))
+        witness = residue_witness(product * numer / denom, signed_count(loop) + P - P**2 + P**3)
+    root_val = c.hint("bundled: root", witness[0])
+    start_val = torus_class(FQ12.one() / root_val)
+    start = _fq6_alloc(c, start_val)                      # the class of 1/c, six numbers
+
+    mover = _Rescaled(c, Q, Pt)
+    forms = _Forms(c, mover.l0, mover.l0_v)
+    root, root_v = forms.scaled(start, start_val, "bundled: root, scaled")
+
+    # Two numbers of the fixed pairing's G1 point, and the monomials in them that the bundles use.
+    def stored(label, value, a, b, equals):
+        """A fresh number t with  t * b = equals  (a is None)  or  a * b = t  (equals is None)."""
+        value = c.hint(label, value % P)
+        out = fp_alloc(c, value)
+        fp_assert(c, [(1, out if a is None else a, b)], [(-1, out if equals is None else equals)], label=label)
+        return out, value
+
+    y_inv = pow(Ptf.yv, -1, P)
+    rho, rho_v = stored("compact: x over y", Ptf.xv * y_inv, None, Ptf.y, Ptf.x)        # rho y = x
+    eta, eta_v = stored("compact: one over y", y_inv, None, Ptf.y, fp_const(c, 1))      # eta y = 1
+    bundles = _bundles((tuple(ints(Qf.xv)), tuple(ints(Qf.yv))), loop, max_degree)
+    needed = set()
+    for _, poly in bundles:
+        for b, e in poly:
+            while (b, e) not in needed and (b, e) not in ((0, 0), (1, 0), (0, 1)):
+                needed.add((b, e))
+                b, e = (1, e) if b == 2 else (b, e - 1)       # what it is made from
+    mono = {(0, 0): (None, 1), (1, 0): (rho, rho_v), (0, 1): (eta, eta_v)}
+    for b, e in sorted(needed, key=lambda key: (key[0] + key[1], key[0])):
+        below, by = (mono[(1, e)], (rho, rho_v)) if b == 2 else (mono[(b, e - 1)], (eta, eta_v))
+        mono[(b, e)] = stored("bundled: power", below[1] * by[1], below[0], by[0], None)
+
+    def bundle(poly):
+        """The form-A value G of a bundle of fixed lines N + M w:  G * M = l0 * N."""
+        sides = []
+        for part in _split_bundle(poly):
+            lins, values = [ZERO] * 12, [0] * 12
+            for key, coefs in sorted(part.items()):
+                lin, value = mono[key]
+                for i, k in enumerate(coefs):
+                    if k:
+                        lins[2 * i] = lins[2 * i] + (fp_const(c, k) if lin is None else _times(c, lin, k))
+                        values[2 * i] = (values[2 * i] + k * value) % P
+            sides.append((lins, FQ12(values)))
+        (n, n_v), (m, m_v) = sides
+        value = c.hint("bundled: fixed lines", fq12_mul(fq12_mul(forms.l0_v, n_v), fq6_inverse(m_v)))
+        out = _fq6_alloc(c, value)
+        fq12_assert(c, [(1, out, m), (-1, forms.l0, n)], [], label="bundled: fixed lines")
+        return out, value
+
+    def b_part(line, lv):
+        """The moving line l0 + a w is in form B as it stands: its a."""
+        return [line[k + 1] if k % 2 == 0 else ZERO for k in range(12)], _split(lv)[1]
+
+    ends = {last: poly for last, poly in bundles}
+    x, xv, form = root, root_v, "A"
+    for k, d in enumerate(loop):
+        x, xv = forms.square(x, xv, form, "bundled: square")
+        h, hv = b_part(*mover.double())
+        x, xv, form = forms.times_b(x, xv, "A", h, hv, "bundled: line")
+        if d:
+            # digit 1: one more factor 1/c.  digit -1: one more factor c, whose class is the negative.
+            fold = (root, root_v) if d == 1 else ([-t for t in root], FQ12.zero() - root_v)
+            x, xv, form = forms.times_a(x, xv, form, fold[0], fold[1], "bundled: root in")
+            h, hv = b_part(*mover.add(mover.start, sign=d))
+            x, xv, form = forms.times_b(x, xv, form, h, hv, "bundled: line")
+        if k in ends and k != len(loop) - 1:
+            g, gv = bundle(ends[k])
+            x, xv, form = forms.times_a(x, xv, form, g, gv, "bundled: fixed lines in")
+    q1, nq2 = _frobenius_points(c, Q)
+    h, hv = b_part(*mover.add(mover.scaled(q1)))
+    x, xv, form = forms.times_b(x, xv, form, h, hv, "bundled: line")
+    h, hv = b_part(*mover.add(mover.scaled(nq2), want_sum=False))
+    x, xv, form = forms.times_b(x, xv, form, h, hv, "bundled: line")
+    g, gv = bundle(ends[len(loop) - 1])
+    x, xv, form = forms.times_a(x, xv, form, g, gv, "bundled: fixed lines in")
+
+    g, g_val = forms.plain(x, xv, form, "bundled: class")
+    _compact_tail(c, g, g_val, start, start_val, numer, denom)

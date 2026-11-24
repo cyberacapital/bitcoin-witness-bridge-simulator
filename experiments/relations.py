@@ -1,27 +1,33 @@
-"""Two ideas for shrinking the proof-checker encoding further, tested and found not to work.
+"""Four ideas for shrinking the proof-checker encoding, each put to the same test.
 
-Run with:  python experiments/relations.py      (needs py_ecc; about four minutes)
+Run with:  python experiments/relations.py            (needs py_ecc; about ten minutes)
+           python experiments/relations.py c d        (only some of them)
 
-The encoding stores, for every step of the pairing loop, three values of six
-numbers each: the running product squared, the class of the step's two lines,
-and their product. Matching the paper's size would need fewer or smaller values.
-
-  Idea A: drop one of the three values.
-  Idea B: use values of four numbers, working up to factors from both subfields.
-
-Question in both: among a given set of stored numbers, is there ANY equation of
-degree at most two that honest values always satisfy? The lock's gates have
-degree two, so if there is none, no set of gates in those numbers alone can tie
-them together, however cleverly it is written.
+The question each time: among a given set of stored numbers, is there ANY
+equation of degree at most two that honest values always satisfy? The lock's
+gates have degree two, so if there is none, no set of gates in those numbers
+alone can tie them together, however cleverly it is written.
 
 Method: draw many random honest instances, list every monomial of degree at
 most two in the numbers, and compute the rank of that table modulo p. Each
 missing rank is one relation. Controls check that known relations are found.
 
-Results (seeded, so they repeat): once the squared product or the lines' class
-is dropped, no relation ties the result of a loop step to the values that are
-left, and the four-number values have no degree-two multiplication rule in the
-form tried here. That rules out these two ideas, not every other one.
+  Idea A: in a loop step that multiplies both pairings' lines in at once, drop
+          one of the three stored values (the square, the lines' class, the product).
+  Idea B: use values of four numbers, working up to factors from both subfields.
+  Idea C: follow the moving point by its lines alone, without its x-coordinate.
+  Idea D: values of four numbers again, this time inside a loop step: squaring,
+          multiplying by one line, and both at once.
+
+Results (seeded, so they repeat). A: no relation ties the result to what is
+left once the square or the lines' class is dropped. B: no multiplication rule.
+C: none between consecutive lines; with x stored at every other step, none
+either. D: none. Each rules out one idea in the form tried, not every other.
+
+Idea A's step is the one the "compact" and "rescaled" checks use. The
+"bundled" check gets below it another way: it multiplies in one pairing's line
+at a time (two forms of the running value make that take two stored values,
+not three) and brings the other pairing's lines in a few steps at a time.
 """
 import itertools, pathlib, random, sys, time
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
@@ -60,6 +66,17 @@ def nullity(rows, n_vars):
         rank += 1; col += 1
     return n - rank, n
 
+def draw_and_count(label, draw, wanted, expect=""):
+    rows = []
+    while len(rows) < wanted:
+        row = draw()
+        if row is not None:
+            rows.append(row)
+    k, n = nullity(rows, len(rows[0]))
+    print(f"   {label:<66} {len(rows[0]):>2} numbers, {n:>3} monomials, relations found: {k}  {expect}", flush=True)
+    return k
+
+
 # ---------------------------------------------------------------- idea A: fewer stored values per step
 # One loop step with fixed constants: g -> G = g*g -> g' = G * (class tau of the two lines).
 m_c, t_c, l0 = rand_k(), rand_k(), rand_k()
@@ -72,21 +89,23 @@ def one_step():
     tau = mul(A, inv(B)); G = tmul(g, g); g2 = tmul(G, tau)
     return dict(g=nums6(g), mu=nums2(mu), nu=nums2(nu), tau=nums6(tau), G=nums6(G), new=nums6(g2))
 
-samples = [one_step() for _ in range(480)]
-def test(names, label, expect=""):
-    rows = [sum((s[n] for n in names), []) for s in samples]
-    t = time.time(); k, n = nullity(rows, len(rows[0]))
-    print(f"   {label:<62} {len(rows[0]):>2} numbers, {n:>3} monomials, relations found: {k}  {expect}", flush=True)
-    return k
-print("IDEA A  one loop step: which stored values can be dropped?")
-full = test(["g", "G", "mu", "nu", "tau", "new"], "(control) everything stored today")
-test(["g", "mu", "nu", "new"], "drop the square and the lines' class")
-tau_only = test(["tau"], "(control) the lines' class alone: it has only 4 free numbers")
-no_square = test(["g", "tau", "new"], "drop the square, keep the lines' class")
-print(f"      relations that involve the result: {no_square - tau_only}")
-no_new = test(["g", "G", "mu", "nu"], "(control) square and line values, without the result")
-with_new = test(["g", "G", "mu", "nu", "new"], "drop the lines' class, keep the square")
-print(f"      relations that involve the result: {with_new - no_new}")
+def idea_a():
+    samples = [one_step() for _ in range(480)]
+    def test(names, label, expect=""):
+        rows = [sum((s[n] for n in names), []) for s in samples]
+        k, n = nullity(rows, len(rows[0]))
+        print(f"   {label:<62} {len(rows[0]):>2} numbers, {n:>3} monomials, relations found: {k}  {expect}", flush=True)
+        return k
+    print("IDEA A  one loop step with both pairings' lines: which stored values can be dropped?")
+    test(["g", "G", "mu", "nu", "tau", "new"], "(control) everything the compact check stores")
+    test(["g", "mu", "nu", "new"], "drop the square and the lines' class")
+    tau_only = test(["tau"], "(control) the lines' class alone: it has only 4 free numbers")
+    no_square = test(["g", "tau", "new"], "drop the square, keep the lines' class")
+    print(f"      relations that involve the result: {no_square - tau_only}")
+    no_new = test(["g", "G", "mu", "nu"], "(control) square and line values, without the result")
+    with_new = test(["g", "G", "mu", "nu", "new"], "drop the lines' class, keep the square")
+    print(f"      relations that involve the result: {with_new - no_new}")
+
 
 # ---------------------------------------------------------------- idea B: values of four numbers
 # Classes up to factors from both subfields. A class of six numbers g = g0 + g1 v + g2 v^2 is moved by
@@ -170,20 +189,104 @@ def rand_reduced():
     return rand_k() + mul(rand_k(), V)
 def nums4(z): co = pg.ints(z); return [co[0], co[2], co[6], co[8]]
 
-print("\nIDEA B  values of four numbers: is there a degree-two rule for multiplying them?")
-t = time.time(); triples = []
-while len(triples) < 130:
-    x, y = rand_reduced(), rand_reduced()
-    z = reduced(tmul(x, y))
-    if z is not None:
-        co = pg.ints(z); assert co[4] == 0 and co[10] == 0
-        triples.append(nums4(x) + nums4(y) + nums4(z))
-print(f"   {len(triples)} honest triples x * y = z drawn in {time.time() - t:.0f} s")
-k, n = nullity(triples, 12)
-print(f"   three reduced values, 12 numbers, {n} monomials, relations found: {k}")
-# control: the six-number classes do have their degree-two rule
-ctrl = []
-for _ in range(240):
-    x, y = rand6(), rand6(); ctrl.append(nums6(x) + nums6(y) + nums6(tmul(x, y)))
-k, n = nullity(ctrl, 18)
-print(f"   (control) three six-number values, 18 numbers, {n} monomials, relations found: {k}")
+def idea_b():
+    print("\nIDEA B  values of four numbers: is there a degree-two rule for multiplying them?")
+    t = time.time(); triples = []
+    while len(triples) < 130:
+        x, y = rand_reduced(), rand_reduced()
+        z = reduced(tmul(x, y))
+        if z is not None:
+            co = pg.ints(z); assert co[4] == 0 and co[10] == 0
+            triples.append(nums4(x) + nums4(y) + nums4(z))
+    print(f"   {len(triples)} honest triples x * y = z drawn in {time.time() - t:.0f} s")
+    k, n = nullity(triples, 12)
+    print(f"   three reduced values, 12 numbers, {n} monomials, relations found: {k}")
+    # control: the six-number classes do have their degree-two rule
+    ctrl = []
+    for _ in range(240):
+        x, y = rand6(), rand6(); ctrl.append(nums6(x) + nums6(y) + nums6(tmul(x, y)))
+    k, n = nullity(ctrl, 18)
+    print(f"   (control) three six-number values, 18 numbers, {n} monomials, relations found: {k}")
+
+
+# ---------------------------------------------------------------- idea C: the moving point by its lines alone
+# The y-free point arithmetic stores, per doubling, the tangent's slope mu and intercept nu and
+# the new x-coordinate: three numbers of F_p^2. The line needs mu and nu. Is x needed?
+FQ2 = bn.FQ2
+def rand_2(): return FQ2([rng.randrange(P), rng.randrange(P)])
+def co2(v): return [int(v.coeffs[0]), int(v.coeffs[1])]
+
+def tangent_chain(steps):
+    """A random point on a random curve Y^2 = X^3 + b and the tangents at it and its doubles."""
+    x, y = rand_2(), rand_2()
+    b = y * y - x * x * x
+    out = []
+    for _ in range(steps):
+        mu = 3 * x * x / (2 * y)
+        nu = y - mu * x
+        out.append(dict(x=x, mu=mu, nu=nu))
+        nx = mu * mu - 2 * x
+        x, y = nx, mu * (x - nx) - y
+    out.append(dict(x=x))
+    return b, out
+
+def idea_c():
+    print("\nIDEA C  the moving point followed by its lines alone, without x")
+    def rows_of(pick, steps=3):
+        def draw():
+            b, chain = tangent_chain(steps)
+            return sum((co2(v) for v in pick(b, chain)), [])
+        return draw
+    line = lambda c, i: [c[i]["mu"], c[i]["nu"]]
+    control = draw_and_count("(control) two lines, the x between them and the next x",
+                             rows_of(lambda b, c: line(c, 0) + [c[1]["x"]] + line(c, 1) + [c[2]["x"]]), 150,
+                             "(six are used today)")
+    one = draw_and_count("(control) one line and the curve's constant", rows_of(lambda b, c: [b] + line(c, 0)), 60)
+    two = draw_and_count("two lines in a row and the curve's constant",
+                         rows_of(lambda b, c: [b] + line(c, 0) + line(c, 1)), 110)
+    print(f"      relations that tie the second line to the first: {two - 2 * one}")
+    three = draw_and_count("three lines in a row and the curve's constant",
+                           rows_of(lambda b, c: [b] + line(c, 0) + line(c, 1) + line(c, 2), 4), 180)
+    print(f"      relations that tie the third line to the first two: {three - two - one}")
+    before = draw_and_count("(control) x, the line there, and the next line",
+                            rows_of(lambda b, c: [c[0]["x"]] + line(c, 0) + line(c, 1)), 110)
+    after = draw_and_count("x stored at every other step: x, two lines, the x after both",
+                           rows_of(lambda b, c: [c[0]["x"]] + line(c, 0) + line(c, 1) + [c[2]["x"]]), 150)
+    print(f"      relations that involve the later x: {after - before}   (six would be needed)")
+
+
+# ---------------------------------------------------------------- idea D: four-number values in a loop step
+# Idea B asked for a rule to multiply two reduced values. A loop step needs less: the square of
+# one reduced value, and its product with a line, which has a special shape.
+def idea_d():
+    print("\nIDEA D  values of four numbers inside one loop step")
+    def line_class():
+        mu, nu = rand_k(), rand_k()
+        return mu, nu, mul(l0, inv(mu + mul(nu, V)))           # the class of the line l0 + (mu + nu v) w
+    def squared():
+        x = rand_reduced(); z = reduced(tmul(x, x))
+        return None if z is None else nums4(x) + nums4(z)
+    def times_line():
+        x = rand_reduced(); mu, nu, cls = line_class(); z = reduced(tmul(x, cls))
+        return None if z is None else nums4(x) + nums2(mu) + nums2(nu) + nums4(z)
+    def whole_step():
+        x = rand_reduced(); mu, nu, cls = line_class(); z = reduced(tmul(tmul(x, x), cls))
+        return None if z is None else nums4(x) + nums2(mu) + nums2(nu) + nums4(z)
+    def line_alone():
+        x = rand_reduced(); mu, nu, cls = line_class()
+        return nums4(x) + nums2(mu) + nums2(nu)
+    t = time.time()
+    draw_and_count("a reduced value and its reduced square", squared, 70)
+    base = draw_and_count("(control) a reduced value and a line, no result", line_alone, 70)
+    k = draw_and_count("a reduced value, a line, and their reduced product", times_line, 130)
+    print(f"      relations that involve the result: {k - base}")
+    k = draw_and_count("a reduced value, a line, and the reduced (square times line)", whole_step, 130)
+    print(f"      relations that involve the result: {k - base}")
+    print(f"   ({time.time() - t:.0f} s)")
+
+
+if __name__ == "__main__":
+    chosen = [a.lower() for a in sys.argv[1:]] or ["a", "b", "c", "d"]
+    for name, run in (("a", idea_a), ("b", idea_b), ("c", idea_c), ("d", idea_d)):
+        if name in chosen:
+            run()
