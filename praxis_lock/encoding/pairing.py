@@ -721,8 +721,128 @@ def _fixed_add(R, Q):
     return m, y - m * x, (nx, m * (x - nx) - y)
 
 
+def _sqrt_in_fq2(value: int) -> "FQ2":
+    """A square root, in F_p^2, of a number of F_p. One always exists: p = 3 mod 4,
+    so either the number or its negative is a square in F_p, and u^2 = -1."""
+    value %= P
+    s = pow(value, (P + 1) // 4, P)
+    if s * s % P == value:
+        return FQ2([s, 0])
+    return FQ2([0, pow(-value % P, (P + 1) // 4, P)])
+
+
+def _fq2_times(c: Circuit, pair, k: "FQ2"):
+    """A constant of F_p^2 times an F_p^2 value made of bits."""
+    k0, k1 = ints(k)
+    part = lambda lin, coef: _times(c, lin, coef) if lin and coef % P else ZERO
+    return (part(pair[0], k0) + part(pair[1], -k1), part(pair[0], k1) + part(pair[1], k0))
+
+
+class _Rescaled:
+    """The moving G2 point followed without its y-coordinate and without separate line values.
+
+    Let A = (x_A, y_A) be the G1 point of this pairing and alpha in F_p^2 with
+    alpha^2 = 1 / x_A. Move the twist curve by  X = x / x_A,  Y = y * alpha^3.
+    It keeps its shape, slopes become mu = alpha * m and intercepts nu = alpha^3 * t,
+    and the line through a point, evaluated at A and multiplied by alpha^3
+    (a factor from F_p^2, which the check ignores), is
+
+        l0 + E(mu) w + E(nu) w^3        with  l0 = -alpha^3 y_A  stored once.
+
+    So the slope and intercept that the point arithmetic needs anyway are the
+    line's values, and nothing more is stored for the line.
+
+    The y-coordinate is never stored either. After a step with line (mu, nu)
+    that lands on X', the new point is (X', -(mu X' + nu)); the next step's
+    line (mu', nu') must pass through it, which is  (mu' + mu) X' + nu' + nu = 0.
+    A tangent is recognised by  2 X' X + X^2 + 2 mu nu = 0  together with
+    X' = mu^2 - 2 X; with the point on the line this is  2 mu Y = 3 X^2.
+    Every equation has degree two. Stored per step: mu, nu and X', six numbers.
+    """
+
+    def __init__(self, c: Circuit, Q: G2Point, Pt: G1Point):
+        self.c = c
+        self.x_a = (Pt.x, ZERO)
+        beta_v = c.hint("rescaled: one over x", pow(Pt.xv, -1, P))
+        beta = fp_alloc(c, beta_v)
+        fp_assert(c, [(1, beta, Pt.x)], [(-1, fp_const(c, 1))], label="rescaled: one over x")
+        alpha_v = c.hint("rescaled: root of that", _sqrt_in_fq2(beta_v))
+        self.alpha = fq2_alloc(c, ints(alpha_v))
+        fq2_assert(c, [(1, self.alpha, self.alpha)], [(-1, (beta, ZERO))], label="rescaled: root of that")
+        self.beta_v, self.cube_v = beta_v, alpha_v * beta_v            # alpha^3 = alpha / x_A
+        self.l0_v = c.hint("rescaled: constant term", FQ2.zero() - self.cube_v * Pt.yv)
+        self.l0 = fq2_alloc(c, ints(self.l0_v))
+        fq2_assert(c, [(1, self.l0, self.x_a), (1, self.alpha, (Pt.y, ZERO))], [],
+                   label="rescaled: constant term")                    # l0 x_A = -alpha y_A
+        self.start = self.scaled(Q)
+        self.X, self.Y, self.Xv, self.Yv = self.start
+        self.prev = None
+
+    def scaled(self, pt: G2Point):
+        """Fresh bits for a twist point's coordinates on the rescaled curve."""
+        c = self.c
+        xv = c.hint("rescaled: point x", pt.xv * self.beta_v)
+        yv = c.hint("rescaled: point y", pt.yv * self.cube_v)
+        x, y = fq2_alloc(c, ints(xv)), fq2_alloc(c, ints(yv))
+        fq2_assert(c, [(1, x, self.x_a)], [(-1, pt.x)], label="rescaled: point x")          # X x_A = x
+        fq2_assert(c, [(1, y, self.x_a), (-1, pt.y, self.alpha)], [], label="rescaled: point y")  # Y x_A = y alpha
+        return x, y, xv, yv
+
+    def _on_line(self, mu, nu):
+        if self.Y is not None:                    # the starting point, whose y is stored
+            fq2_assert(self.c, [(1, mu, self.X)], [(1, nu), (-1, self.Y)], label="rescaled: on the line")
+        else:                                     # y = -(previous slope * X + previous intercept)
+            pm, pn = self.prev
+            fq2_assert(self.c, [(1, (mu[0] + pm[0], mu[1] + pm[1]), self.X)], [(1, nu), (1, pn)],
+                       label="rescaled: on the line")
+
+    def _line(self, mu, nu, mu_v, nu_v):
+        line = [ZERO] * 12
+        for pos, value in ((0, self.l0), (1, mu), (3, nu)):
+            line[pos] = value[0] - value[1].scale(9)
+            line[pos + 6] = value[1]
+        (a0, a1), (b0, b1), (c0, c1) = ints(self.l0_v), ints(mu_v), ints(nu_v)
+        return line, FQ12([(a0 - 9 * a1) % P, (b0 - 9 * b1) % P, 0, (c0 - 9 * c1) % P, 0, 0,
+                           a1, b1, 0, c1, 0, 0])
+
+    def _advance(self, mu, nu, nx, mu_v, nu_v, nx_v):
+        self.X, self.Y, self.Xv, self.Yv = nx, None, nx_v, FQ2.zero() - (mu_v * nx_v + nu_v)
+        self.prev = (mu, nu)
+        return self._line(mu, nu, mu_v, nu_v)
+
+    def double(self):
+        """The tangent line at the current point; the point becomes its double."""
+        c = self.c
+        mu_v = c.hint("rescaled: tangent", 3 * self.Xv * self.Xv / (2 * self.Yv))
+        nu_v = c.hint("rescaled: on the line", self.Yv - mu_v * self.Xv)
+        nx_v = c.hint("rescaled: new x", mu_v * mu_v - 2 * self.Xv)
+        mu, nu, nx = (fq2_alloc(c, ints(v)) for v in (mu_v, nu_v, nx_v))
+        self._on_line(mu, nu)
+        fq2_assert(c, [(2, nx, self.X), (1, self.X, self.X), (2, mu, nu)], [], label="rescaled: tangent")
+        fq2_assert(c, [(1, mu, mu)], [(-2, self.X), (-1, nx)], label="rescaled: new x")
+        return self._advance(mu, nu, nx, mu_v, nu_v, nx_v)
+
+    def add(self, other, sign: int = 1, want_sum: bool = True):
+        """The chord through the current point and `other` (from `scaled`), or its negative."""
+        c = self.c
+        ox, oy, oxv, oyv = other
+        if sign == -1:
+            oy, oyv = (-oy[0], -oy[1]), FQ2.zero() - oyv
+        mu_v = c.hint("rescaled: through the other point", (oyv - self.Yv) / (oxv - self.Xv))
+        nu_v = c.hint("rescaled: on the line", self.Yv - mu_v * self.Xv)
+        mu, nu = fq2_alloc(c, ints(mu_v)), fq2_alloc(c, ints(nu_v))
+        self._on_line(mu, nu)
+        fq2_assert(c, [(1, mu, ox)], [(1, nu), (-1, oy)], label="rescaled: through the other point")
+        if not want_sum:
+            return self._line(mu, nu, mu_v, nu_v)
+        nx_v = c.hint("rescaled: new x", mu_v * mu_v - self.Xv - oxv)
+        nx = fq2_alloc(c, ints(nx_v))
+        fq2_assert(c, [(1, mu, mu)], [(-1, self.X), (-1, ox), (-1, nx)], label="rescaled: new x")
+        return self._advance(mu, nu, nx, mu_v, nu_v, nx_v)
+
+
 def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ12",
-                           loop=SIGNED_LOOP, witness=None) -> None:
+                           loop=SIGNED_LOOP, witness=None, rescale: bool = False) -> None:
     """Assert that  Miller(moving) * Miller(fixed) * numer / denom  becomes 1 under the
     final exponentiation, storing as little as this package knows how to.
 
@@ -733,6 +853,9 @@ def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ1
     up to a factor from F_p^6. Nothing ties g down on its own: any g for which
     the last equation holds proves the claim, because the gates then show that
     the product equals (g + w)^(-lambda) times an element of F_p^6.
+
+    With `rescale`, the moving G2 point is followed on a rescaled curve, without
+    its y-coordinate and without separate line values (see `_Rescaled`).
 
     `loop` and `witness` are for small test instances.
     """
@@ -759,18 +882,34 @@ def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ1
     y_inv = pow(Ptf.yv, -1, P)
     rho = stored("compact: x over y", Ptf.xv * y_inv, [(1, None, Ptf.y)], [(-1, Ptf.x)])
     eta = stored("compact: one over y", y_inv, [(1, None, Ptf.y)], [(-1, fp_const(c, 1))])
-    lam1 = stored("compact: y times x over y", Pt.yv * rho.value(), [(1, Pt.y, rho)], [(-1, None)])
-    lam2 = stored("compact: y times one over y", Pt.yv * eta.value(), [(1, Pt.y, eta)], [(-1, None)])
+
+    # The moving line is l0 + a w. Its constant term l0, an F_p^2 number, times rho and eta:
+    if rescale:
+        mover = _Rescaled(c, Q, Pt)
+        l0_rho, l0_eta = [], []
+        for out, scalar, label in ((l0_rho, rho, "rescaled: constant term times x over y"),
+                                   (l0_eta, eta, "rescaled: constant term times one over y")):
+            value = c.hint(label, mover.l0_v * scalar.value())
+            out.extend(fq2_alloc(c, ints(value)))
+            fq2_assert(c, [(1, mover.l0, (scalar, ZERO))], [(-1, tuple(out))], label=label)
+    else:                                   # l0 = -y of the moving pairing's G1 point
+        lam1 = stored("compact: y times x over y", Pt.yv * rho.value(), [(1, Pt.y, rho)], [(-1, None)])
+        lam2 = stored("compact: y times one over y", Pt.yv * eta.value(), [(1, Pt.y, eta)], [(-1, None)])
+        l0_rho, l0_eta = (-lam1, ZERO), (-lam2, ZERO)
 
     def step(g, g_val, line, lv, m, t):
         """Multiply both pairings' lines into the running class through one stored class."""
         (m0, m1), (t0, t1) = ints(m), ints(t)
-        b, l0b, b_co = [ZERO] * 12, [ZERO] * 12, [0] * 12
+        b, b_co = [ZERO] * 12, [0] * 12
         for pos, k in ((0, m0 - 9 * m1), (6, m1), (2, t0 - 9 * t1), (8, t1)):
-            source, with_y = (rho, lam1) if pos in (0, 6) else (eta, lam2)
+            source = rho if pos in (0, 6) else eta
             b[pos] = _times(c, source, -k)                 # the fixed line over -y is 1 + b w
-            l0b[pos] = _times(c, with_y, k)                # l0 * b, where l0 = -y of the other point
             b_co[pos] = -k * source.value() % P
+        # l0 * b = -E(m * l0 rho) - E(t * l0 eta) v, with E(r0 + r1 u) = (r0 - 9 r1) + r1 w^6
+        l0b = [ZERO] * 12
+        for pos, (r0, r1) in ((0, _fq2_times(c, l0_rho, m)), (2, _fq2_times(c, l0_eta, t))):
+            l0b[pos] = r1.scale(9) - r0
+            l0b[pos + 6] = -r1
         bv = FQ12(b_co)
         l0v, av = _split(lv)
         a = [line[k + 1] if k % 2 == 0 else ZERO for k in range(12)]
@@ -778,7 +917,7 @@ def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ1
                                                     fq6_inverse(fq12_mul(l0v, bv) + av)))
         tau = _fq6_alloc(c, tau_val)
         fq12_assert(c, [(1, tau, [l0b[i] + a[i] for i in range(12)]), (-1, _times_v(a), b)],
-                    [(-1, [line[0]] + [ZERO] * 11)], label="compact: lines")
+                    [(-1, [line[k] if k % 2 == 0 else ZERO for k in range(12)])], label="compact: lines")
         return _t_mul(c, g, g_val, tau, tau_val, "compact: step")
 
     negated = lambda pt: G2Point(pt.x, (-pt.y[0], -pt.y[1]), pt.xv, -pt.yv, pt.const)
@@ -786,23 +925,35 @@ def assert_pairing_compact(c: Circuit, moving, fixed, numer: "FQ12", denom: "FQ1
     g, R, Rf = start, Q, (Qf.xv, Qf.yv)
     for d in loop:
         g, g_val = _t_mul(c, g, g_val, g, g_val, "compact: square")
-        line, lv, R = _double_step(c, R, Pt)
+        if rescale:
+            line, lv = mover.double()
+        else:
+            line, lv, R = _double_step(c, R, Pt)
         m, t, Rf = _fixed_double(Rf)
         g, g_val = step(g, g_val, line, lv, m, t)
         if d:
             # digit 1: one more factor 1/c, class g0.  digit -1: one more factor c, class -g0.
             fold = (start, start_val) if d == 1 else ([-x for x in start], FQ12.zero() - start_val)
             g, g_val = _t_mul(c, g, g_val, fold[0], fold[1], "compact: fold")
-            line, lv, R = _add_step(c, R, Q if d == 1 else negated(Q), Pt)
+            if rescale:
+                line, lv = mover.add(mover.start, sign=d)
+            else:
+                line, lv, R = _add_step(c, R, Q if d == 1 else negated(Q), Pt)
             m, t, Rf = _fixed_add(Rf, (Qf.xv, Qf.yv * d))
             g, g_val = step(g, g_val, line, lv, m, t)
     q1, nq2 = _frobenius_points(c, Q)
     f1 = (conj(Qf.xv) * FROB_X, conj(Qf.yv) * FROB_Y)
     f2 = (Qf.xv * FROB2_X, -(Qf.yv * FROB2_Y))
-    line, lv, R = _add_step(c, R, q1, Pt)
+    if rescale:
+        line, lv = mover.add(mover.scaled(q1))
+    else:
+        line, lv, R = _add_step(c, R, q1, Pt)
     m, t, Rf = _fixed_add(Rf, f1)
     g, g_val = step(g, g_val, line, lv, m, t)
-    line, lv, _ = _add_step(c, R, nq2, Pt, want_sum=False)
+    if rescale:
+        line, lv = mover.add(mover.scaled(nq2), want_sum=False)
+    else:
+        line, lv, _ = _add_step(c, R, nq2, Pt, want_sum=False)
     m, t, _ = _fixed_add(Rf, f2)
     g, g_val = step(g, g_val, line, lv, m, t)
 

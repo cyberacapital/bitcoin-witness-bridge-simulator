@@ -135,11 +135,11 @@ def verify(vk: VerifyingKey, public, proof) -> bool:
     return ob.final_exponentiate(product) == ob.FQ12.one()
 
 
-CHECKS = ("compact", "folded", "root")
+CHECKS = ("rescaled", "compact", "folded", "root")
 
 
 def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
-                    style: str = "wide", check: str = "compact") -> Circuit:
+                    style: str = "wide", check: str = "rescaled") -> Circuit:
     """The Groth16 verifier as gates over bits, built with `proof` as the assignment.
 
     The unknown bits are the proof's coordinates plus every intermediate value
@@ -160,6 +160,8 @@ def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
       "folded"   the root folded into the pairing loop
       "compact"  folded, with the running product stored in half the space,
                  the two lines of each step merged, and a signed loop
+      "rescaled" compact, with the moving G2 point followed without its
+                 y-coordinate and without separate line values
 
     The defaults give the smallest statement.
     """
@@ -173,8 +175,8 @@ def encode_verifier(vk: VerifyingKey, public, proof, materialize: bool = False,
     L = public_point(vk, public)
     numer = miller_value(vk.gamma_g2, bn.neg(L))
     denom = miller_value(vk.beta_g2, vk.alpha_g1)
-    if check == "compact":
-        assert_pairing_compact(c, pairs[0], pairs[1], numer, denom)
+    if check in ("compact", "rescaled"):
+        assert_pairing_compact(c, pairs[0], pairs[1], numer, denom, rescale=check == "rescaled")
         c.mark("the two pairings that involve the proof and the final check, in one loop")
     elif check == "folded":
         assert_pairing_folded(c, pairs, numer, denom)

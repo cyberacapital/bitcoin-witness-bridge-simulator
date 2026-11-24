@@ -88,15 +88,17 @@ def part_two() -> None:
     paper = Params.paper()
     print("\nPART 3  What each shrinking step saved\n")
     print("       arithmetic   final check             unknown bits     gates   widest gate   times the paper")
-    names = {"root": "separate root", "folded": "folded into loop", "compact": "compact (default)"}
-    for style, check in (("narrow", "root"), ("wide", "root"), ("wide", "folded"), ("wide", "compact")):
-        other = c if (style, check) == ("wide", "compact") else g.encode_verifier(vk, [47053], proof, style=style, check=check)
+    names = {"root": "separate root", "folded": "folded into loop", "compact": "compact",
+             "rescaled": "rescaled (default)"}
+    for style, check in (("narrow", "root"), ("wide", "root"), ("wide", "folded"), ("wide", "compact"),
+                         ("wide", "rescaled")):
+        other = c if (style, check) == ("wide", "rescaled") else g.encode_verifier(vk, [47053], proof, style=style, check=check)
         assert other.satisfied
         print(f"       {style:<10}   {names[check]:<21} {other.n_bits:>14,} {other.n_gates:>9,} {other.max_products:>13,}"
               f" {other.n_bits / paper.N:>17.1f}")
     print(f"       the paper's own encoding         {paper.N:>14,} {1692:>9,}  at most 2,047 {1.0:>17.1f}")
     print("\nThe paper does not say how its encoding is built. This one was written from")
-    print("scratch, is still nearly twice the size, and has known gaps; see the README.")
+    print("scratch, is still about 1.6 times the size, and has known gaps; see the README.")
 
 
 if __name__ == "__main__":

@@ -540,7 +540,7 @@ class EveryCheckIsNeeded(unittest.TestCase):
                                  witness=(self.fold_root, choice))
         return c
 
-    def compact(self, tamper=None, materialize=False, style="narrow", shift=0):
+    def compact(self, tamper=None, materialize=False, style="narrow", shift=0, rescale=False):
         """A short signed loop with the compact check. `shift` multiplies the
         right-hand constant by a power of omega, which must make no difference."""
         pg = self.pg
@@ -551,7 +551,7 @@ class EveryCheckIsNeeded(unittest.TestCase):
         c.tamper = tamper
         moving, fixed = self.pairs(c)
         pg.assert_pairing_compact(c, moving, fixed, self.numer, denom, self.COMPACT_LOOP,
-                                  witness=(self.fold_root, 0))
+                                  witness=(self.fold_root, 0), rescale=rescale)
         return c
 
     @staticmethod
@@ -596,6 +596,15 @@ class EveryCheckIsNeeded(unittest.TestCase):
                       "compact: y times x over y"]
     NARROW_ONLY = ["compact: Frobenius 1", "compact: Frobenius 2", "compact: Frobenius 3",
                    "compact: constant multiple"]
+    RESCALED_LABELS = ["Frobenius x", "Frobenius y", "Frobenius^2 x", "Frobenius^2 y", "G1: x squared",
+                       "G2: x squared", "compact: Frobenius 1 product", "compact: Frobenius 2 product",
+                       "compact: fold", "compact: lines", "compact: one over y", "compact: root",
+                       "compact: square", "compact: step", "compact: x over y",
+                       "rescaled: constant term", "rescaled: constant term times one over y",
+                       "rescaled: constant term times x over y", "rescaled: new x",
+                       "rescaled: on the line", "rescaled: one over x", "rescaled: point x",
+                       "rescaled: point y", "rescaled: root of that", "rescaled: tangent",
+                       "rescaled: through the other point"]
     FOLD_LABELS = ["Miller: fold", "Miller: square", "fold: Frobenius 1", "fold: Frobenius 2",
                    "fold: Frobenius 3", "fold: choice", "fold: first product", "fold: inverse",
                    "fold: one choice", "fold: root", "fold: second product"]
@@ -634,6 +643,45 @@ class EveryCheckIsNeeded(unittest.TestCase):
                            labels + self.NARROW_ONLY, only=self.NARROW_ONLY,
                            every={"compact: constant multiple": 6})
         self.assertEqual(tried, 11)
+
+    def test_every_helper_value_of_the_y_free_moving_point_is_checked(self):
+        tried = self.sweep(lambda tamper: self.compact(tamper, style="wide", rescale=True),
+                           self.RESCALED_LABELS)
+        self.assertEqual(tried, 56)
+        self.assertTrue(self.compact(style="narrow", rescale=True).satisfied)
+
+    def test_the_y_free_moving_point_works_for_either_kind_of_square_root(self):
+        """The rescaling needs a square root of 1 / x_A. It lies in F_p for some
+        proofs and only in F_p^2 for others; the same gates must serve both."""
+        bn, pg = self.bn, self.pg
+        kinds = set()
+        for k in range(2, 12):
+            A = bn.multiply(bn.G1, k)
+            root = pg._sqrt_in_fq2(pow(int(A[0]), -1, P))
+            self.assertEqual(root * root, bn.FQ2([pow(int(A[0]), -1, P), 0]))
+            kind = "plain" if int(root.coeffs[1]) == 0 else "imaginary"
+            if kind in kinds:
+                continue
+            kinds.add(kind)
+            miller = (pg.miller_value(self.B, A, self.COMPACT_LOOP)
+                      * pg.miller_value(self.D, bn.neg(self.C), self.COMPACT_LOOP))
+            denom = miller * self.numer / pg.fq12_pow(self.fold_root, self.compact_exponent)
+            c = Circuit()
+            moving = (pg.alloc_g2(c, self.B), pg.alloc_g1(c, A))
+            fixed = (pg.const_g2(c, self.D), pg.alloc_g1(c, self.C).neg())
+            pg.assert_pairing_compact(c, moving, fixed, self.numer, denom, self.COMPACT_LOOP,
+                                      witness=(self.fold_root, 0), rescale=True)
+            self.assertTrue(c.satisfied, (kind, c.failures[:3]))
+        self.assertEqual(kinds, {"plain", "imaginary"})
+
+    def test_no_bit_of_the_y_free_computation_is_left_free(self):
+        c = self.compact(materialize=True, rescale=True)
+        self.assertTrue(c.satisfied, c.failures[:3])
+        self.assertTrue(holds(c.gates, c.x))
+        self.assertEqual(bits_free_to_flip(c.gates, c.x), [])
+        c = self.compact(self.wrong("rescaled: tangent", 1), materialize=True, rescale=True)
+        self.assertFalse(c.satisfied)
+        self.assertFalse(holds(c.gates, c.x))
 
     def test_the_compact_check_needs_no_choice(self):
         """Multiplying the right-hand constant by any power of omega changes
@@ -754,8 +802,8 @@ class Groth16Verifier(unittest.TestCase):
         self.assertTrue(c.satisfied, c.failures[:3])
         self.assertEqual((c.style, c.max_products), ("wide", 3048))
         # Sizes, pinned so that changes to the encoding are noticed.
-        self.assertTrue(700_000 < c.n_bits < 745_000, c.n_bits)
-        self.assertTrue(4_940 < c.n_gates < 5_000, c.n_gates)
+        self.assertTrue(610_000 < c.n_bits < 650_000, c.n_bits)
+        self.assertTrue(4_280 < c.n_gates < 4_340, c.n_gates)
 
     def test_a_fresh_proof_of_the_same_statement_also_satisfies_them(self):
         other = self.g.prove(self.r1cs, self.trapdoor, [1, 47053, 223, 211, 223 * 223])
@@ -791,9 +839,10 @@ class Groth16Verifier(unittest.TestCase):
         g, (A, B, C) = self.g, self.proof
         forged = (A, B, bn.multiply(bn.G1, 12345))
         expected = {                      # (style, check): bits, gates, most products in a gate
+            ("wide", "compact"): ((700_000, 745_000), (4_940, 5_000), 3048),
             ("wide", "folded"): ((1_400_000, 1_460_000), (9_900, 9_980), 3048),
             ("wide", "root"): ((2_480_000, 2_550_000), (17_300, 17_400), 3048),
-            ("narrow", "compact"): ((2_950_000, 3_100_000), (18_250, 18_420), 99),
+            ("narrow", "rescaled"): ((2_950_000, 3_100_000), (18_200, 18_350), 99),
             ("narrow", "folded"): ((4_750_000, 4_850_000), (29_250, 29_450), 69),
             ("narrow", "root"): ((8_450_000, 8_580_000), (51_500, 51_750), 69),
         }
