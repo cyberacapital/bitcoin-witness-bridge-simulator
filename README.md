@@ -3,6 +3,10 @@
 [![tests](https://github.com/CyberaCapital/bitcoin-witness-bridge-simulator/actions/workflows/tests.yml/badge.svg)](https://github.com/CyberaCapital/bitcoin-witness-bridge-simulator/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+<p align="center">
+  <img src="docs/overview.svg" width="900" alt="How the simulated bridge works. On Bitcoin: a vault is made and its key is cut into pieces, each sealed in a lock and deleted; a user deposits Bitcoin; nobody holds the key. On Solana: the deposit is checked and the same amount is minted as tokens; tokens are used to launch and trade coins; a holder burns tokens and attaches the fingerprint of a secret. Proof of the burn plus the secret opens the lock and the burner moves the Bitcoin. The repository holds bridge_sim (the whole bridge as a runnable model with a simulated lock), praxis_lock (the lock scheme at toy size) and praxis_lock/encoding (a proof checker rewritten for the lock). Simulator only.">
+</p>
+
 > **Simulator only. This is not a bridge.** It touches no real network and no real
 > money. The bridge model uses a simulated lock, and the real lock included here runs
 > only at toy parameters with no security. Everything is a first draft written with
@@ -503,6 +507,7 @@ tests/test_praxis_lock.py 22 lock tests
 tests/test_encoding.py   50 encoding tests
 experiments/relations.py  four shrinking ideas, tested and found not to work
 demo.py, demo_lock.py, demo_encoding.py   narrated runs
+docs/overview.svg        the picture at the top of this page
 ```
 
 ## Next stages
