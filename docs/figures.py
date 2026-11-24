@@ -1,4 +1,4 @@
-"""Draws the five figures used in the README.
+"""Draws the six figures used in the README.
 
 Run with:  python docs/figures.py        (no dependencies; writes the .svg files next to itself)
 
@@ -343,7 +343,51 @@ def limits():
     p.save("limits.svg")
 
 
+# ---------------------------------------------------------------- 6. the seven steps, as a map for the list in chapter 3
+
+def steps():
+    p = Picture(960, 398, "Figure 3.A", "The seven steps of the bridge",
+                "On Bitcoin: 1 seal empty vaults, 2 deposit Bitcoin, 7 the vault opens for the burner. On Solana: "
+                "3 mint bridged Bitcoin, 4 launch a coin, 5 trade priced in Bitcoin, 6 burn with a secret mark. "
+                "Proof of deposit leads from step 2 to step 3. Proof of the burn plus the secret leads from step 6 "
+                "to step 7.")
+    p.heading("Two proofs join the chains: of the deposit on the way in, and of the burn on the way out.")
+    w, h, top, low = 136, 60, 118, 258
+    cols = [152, 310, 468, 626, 784]
+
+    def node(x, y, number, rows, colour, soft):
+        p.box(x, y, w, h)
+        p.add(f'<rect x="{x}" y="{y}" width="4" height="{h}" fill="{colour}"/>')
+        p.badge(x + 14, y + 19, number, colour, soft)
+        p.lines(x + 46, y + 26, rows, leading=16)
+
+    p.tag(40, top + h / 2 + 5, "ON BITCOIN", BTC, BTC_SOFT)
+    node(cols[0], top, "1", ["Seal empty", "vaults"], BTC, BTC_SOFT)
+    node(cols[1], top, "2", ["Deposit", "Bitcoin"], BTC, BTC_SOFT)
+    node(cols[4], top, "7", ["Vault opens", "for the burner"], BTC, BTC_SOFT)
+    p.arrow(cols[0] + w + 3, top + h / 2, cols[1] - 4, top + h / 2)
+    p.add(f'<line x1="{cols[1] + w + 8}" y1="{top + h / 2}" x2="{cols[4] - 8}" y2="{top + h / 2}" stroke="{LINE}" '
+          f'stroke-width="1.6" stroke-dasharray="2 5"/>')
+    p.text((cols[1] + w + cols[4]) / 2, top + h / 2 - 9, "the Bitcoin stays sealed in the vault", fill=MUTED,
+           style="italic", anchor="middle")
+
+    p.tag(40, low + h / 2 + 5, "ON SOLANA", SOL, SOL_SOFT)
+    for x, number, rows in ((cols[1], "3", ["Mint bridged", "Bitcoin"]), (cols[2], "4", ["Launch", "a coin"]),
+                            (cols[3], "5", ["Trade, priced", "in Bitcoin"]), (cols[4], "6", ["Burn with a", "secret mark"])):
+        node(x, low, number, rows, SOL, SOL_SOFT)
+    for i in (1, 2, 3):
+        p.arrow(cols[i] + w + 3, low + h / 2, cols[i + 1] - 4, low + h / 2)
+
+    p.arrow(cols[1] + w / 2, top + h + 4, cols[1] + w / 2, low - 5)
+    p.arrow(cols[4] + w / 2, low - 4, cols[4] + w / 2, top + h + 5)
+    between = (top + h + low) / 2 + 4.5
+    p.text(cols[1] + w / 2 + 12, between, "proof of deposit", fill=MUTED, style="italic")
+    p.text(cols[4] + w / 2 - 12, between, "proof of burn plus secret", fill=MUTED, style="italic", anchor="end")
+    p.foot(low + h + 46, "The numbers are those of the steps in the text.", "Bitcoin is on the upper line and Solana on the lower.")
+    p.save("steps.svg")
+
+
 if __name__ == "__main__":
-    for draw in (overview, uses, pipeline, examples, limits):
+    for draw in (overview, uses, pipeline, examples, limits, steps):
         draw()
     print("wrote", ", ".join(sorted(f.name for f in HERE.glob("*.svg"))))

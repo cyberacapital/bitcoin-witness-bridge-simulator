@@ -211,22 +211,9 @@ zero-knowledge machine is not here at all, and nothing is joined up from end to 
 
 **3.1** The bridge works in seven steps. Figure 3.A shows how they connect.
 
-**Figure 3.A: The seven steps of the bridge**
-
-```mermaid
-flowchart LR
-    subgraph Bitcoin
-        seal[Seal empty vaults] --> deposit[Deposit Bitcoin]
-        open[Vault opens for the burner]
-    end
-    subgraph Solana
-        mint[Mint bridged Bitcoin] --> launch[Launch a coin] --> trade[Trade, priced in Bitcoin] --> burn[Burn with a secret mark]
-    end
-    deposit -- proof of deposit --> mint
-    burn -- proof of burn plus secret --> open
-```
-
-<sub>Source: this repository.</sub>
+<p align="center">
+  <img src="docs/steps.svg" width="900" alt="Figure 3.A: The seven steps of the bridge. On Bitcoin: 1 seal empty vaults, 2 deposit Bitcoin, 7 the vault opens for the burner. On Solana: 3 mint bridged Bitcoin, 4 launch a coin, 5 trade, priced in Bitcoin, 6 burn with a secret mark. Proof of deposit leads from step 2 to step 3; proof of the burn plus the secret leads from step 6 to step 7. Between deposit and opening, the Bitcoin stays sealed in the vault.">
+</p>
 
 1. **Seal.** A setup group creates an empty vault on Bitcoin. Each member makes one
    piece of the vault's key, locks it under the vault's rule and deletes it.
@@ -484,6 +471,9 @@ first principles. It is a different encoding and a larger one.
 - **The checker.** A small Groth16 system for making real proofs to test with, and
   `encode_verifier`, which writes its acceptance test as gates (`groth16.py`).
 
+**6.3** Box 6.A runs a real proof through the ordinary checker, and then through the same
+test written as lock gates.
+
 > **Box 6.A: Checking a real proof with the lock's gates**
 >
 > ```python
@@ -499,7 +489,7 @@ first principles. It is a different encoding and a larger one.
 > g.encode_verifier(vk, [47053], proof, style="narrow", check="root")  # the first, largest form
 > ```
 
-**6.3** Table 6.A shows the measured size on a real proof, for one verifying key and
+**6.4** Table 6.A shows the measured size on a real proof, for one verifying key and
 one public input, which are fixed into the gates as constants, as they are in the
 paper's encoding.
 
@@ -517,13 +507,13 @@ paper's encoding.
 
 <sub>Source: measured by `demo_encoding.py`. The last row is from the paper (ePrint 2026/2971).</sub>
 
-**6.4** The last row but one is the default. In it, an eighth of the bits are
+**6.5** The last row but one is the default. In it, an eighth of the bits are
 bookkeeping and the rest are 1,910 numbers of the proof checker's field, about 22
 for each step of the pairing loop. The narrow layout runs every check too, at 3 to 5
 million bits. The bit counts of the earlier forms move by a few hundred from one
 verifying key to another; the demo makes a fresh key each run.
 
-**6.5** What the tests establish:
+**6.6** What the tests establish:
 
 - Both layouts of multiplication modulo a foreign prime are exactly right on
   every possible assignment of miniature instances: every true product is
@@ -566,7 +556,7 @@ verifying key to another; the demo makes a fresh key each run.
 - Each safety check in the encoding was removed in turn, about 165 removals in
   all, to confirm some test notices.
 
-**6.6** What it is not:
+**6.7** What it is not:
 
 - **Not the paper's encoding.** It needs about 1.4 times as many bits. Scaling the
   paper's element counts, a ciphertext for it would be about 11 GiB, not 7.9. Its
@@ -587,21 +577,21 @@ verifying key to another; the demo makes a fresh key each run.
 
 ### From 22 times the paper's size to 1.4
 
-**6.7** The first version used the narrow layout and a separate root, and came to 22
+**6.8** The first version used the narrow layout and a separate root, and came to 22
 times the paper's size. Five changes brought it to 1.4.
 
-**6.8** *Wide gates.* The paper gives its encoding's size and shape but not its
+**6.9** *Wide gates.* The paper gives its encoding's size and shape but not its
 method. Its numbers show a few very wide constraints, and it says that every one of
 them has at least 254 products, which is one multiplication of 254-bit numbers done
 bit by bit. The wide layout here multiplies the same way. It is our reading of those
 numbers, not the paper's construction. It cut the bookkeeping from three quarters of
 all bits to an eighth.
 
-**6.9** *Folding the root.* The separate root check stored 354 values of the largest
+**6.10** *Folding the root.* The separate root check stored 354 values of the largest
 field, about half of everything. Folding it into the pairing loop is the method of
 Novakovic and Eagen's *On Proving Pairings*, worked out again here for these gates.
 
-**6.10** *The compact check.* The last step of a pairing sends every number of the
+**6.11** *The compact check.* The last step of a pairing sends every number of the
 half-size subfield to 1, so the loop's running product only matters up to such
 factors. That class is one number of the half-size field, six base-field numbers
 where the product itself takes twelve, and classes multiply by an equation of degree
@@ -609,14 +599,14 @@ two. The two lines of a loop step are merged into one such class before they are
 multiplied in, and the line of the pairing whose first point is fixed needs no
 stored values at all. The loop is counted in signed digits.
 
-**6.11** *The rescaled moving point.* The loop follows a point of the second curve.
+**6.12** *The rescaled moving point.* The loop follows a point of the second curve.
 Stretching that curve by a factor taken from the proof's own first point makes the
 slope and intercept of each line, which the point arithmetic stores anyway, equal to
 the line's values. The point's y-coordinate is never stored: each new line must pass
 through the mirror image of where the last one landed. That is 6 numbers a step
 where there were 10.
 
-**6.12** *Two forms and bundled lines.* Until here every loop step stored three
+**6.13** *Two forms and bundled lines.* Until here every loop step stored three
 six-number values: the running product squared, the two lines merged, and their
 product. The class of a running product can be written in two ways, as a quotient or
 as its inverse, and a line is already in the second form as it stands. Squaring
@@ -630,7 +620,7 @@ cost one value in each of 88 steps.
 
 ### What is left, and what was tried
 
-**6.13** The default stores 1,910 numbers, about 22 for each of the loop's 86 steps.
+**6.14** The default stores 1,910 numbers, about 22 for each of the loop's 86 steps.
 Table 6.B shows where they go.
 
 **Table 6.B: Where the default encoding's stored numbers go**
@@ -646,7 +636,7 @@ Table 6.B shows where they go.
 
 <sub>Source: this repository, counted on the default encoding.</sub>
 
-**6.14** The paper's bit count has room for about 1,350 such numbers if its
+**6.15** The paper's bit count has room for about 1,350 such numbers if its
 bookkeeping per number is like ours, about 16 a step. Read with its other figures,
 the paper also gives away how its constraints are used. It has about 2.3 million
 products in all (it says that rewriting them one product per constraint would take
@@ -657,7 +647,7 @@ bookkeeping". That was wrong: its constraints are fuller, and its bookkeeping pe
 number is probably much like ours. The gap in size is in the count of stored
 numbers.
 
-**6.15** In this design a doubling step takes 18 numbers: 6 for the point, 6 for the
+**6.16** In this design a doubling step takes 18 numbers: 6 for the point, 6 for the
 square, 6 for the line. Even with the second pairing and the root costing nothing it
 would stop near 1.1 times the paper, so if our reading of the paper's figures is
 right, its encoding holds at least one idea that is not in this one. Four candidates
@@ -677,7 +667,7 @@ can express. None works in the form tried:
   without the x-coordinate between them, satisfy no equation of degree two.
   Storing x at every other step leaves two equations where six are needed.
 
-**6.16** Two smaller steps are known and not built. A windowed loop with fewer
+**6.17** Two smaller steps are known and not built. A windowed loop with fewer
 additions would save about 3%. A layout with one main constraint per number and a
 shared one for overflow, which is what we think the paper's figures point to, would
 cut gates and products but not bits.
@@ -733,7 +723,7 @@ tests/test_praxis_lock.py 22 lock tests
 tests/test_encoding.py   50 encoding tests
 experiments/relations.py  four shrinking ideas, tested and found not to work
 demo.py, demo_lock.py, demo_encoding.py   narrated runs
-docs/overview.svg, uses.svg, pipeline.svg, examples.svg, limits.svg   the figures in this document
+docs/overview.svg, uses.svg, pipeline.svg, examples.svg, limits.svg, steps.svg   the figures in this document
 docs/figures.py          draws them
 docs/number.py           numbers this document's paragraphs
 ```
