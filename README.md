@@ -17,7 +17,7 @@ November 2026
 > publication.
 
 <p align="center">
-  <img src="docs/overview.svg" width="900" alt="Figure 1: A Bitcoin to Solana bridge with no operator. On Bitcoin: a vault is made and its key is cut into pieces, each sealed in a lock and deleted; a user deposits Bitcoin; nobody holds the key. On Solana: the deposit is checked and the same amount is minted as tokens; tokens are used to launch and trade coins; a holder burns tokens and attaches the fingerprint of a secret. Proof of the burn plus the secret opens the lock and the burner moves the Bitcoin. The repository holds bridge_sim (the whole bridge as a runnable model with a simulated lock), praxis_lock (the lock scheme at toy size) and praxis_lock/encoding (a proof checker rewritten for the lock). Simulator only.">
+  <img src="docs/overview.svg" width="900" alt="A Bitcoin to Solana bridge with no operator. On Bitcoin: a vault is made and its key is cut into pieces, each sealed in a lock and deleted; a user deposits Bitcoin; nobody holds the key. On Solana: the deposit is checked and the same amount is minted as tokens; tokens are used to launch and trade coins; a holder burns tokens and attaches the fingerprint of a secret. Proof of the burn plus the secret opens the lock and the burner moves the Bitcoin. The repository holds bridge_sim (the whole bridge as a runnable model with a simulated lock), praxis_lock (the lock scheme at toy size) and praxis_lock/encoding (a proof checker rewritten for the lock). Simulator only.">
 </p>
 
 ## Contents
@@ -43,16 +43,16 @@ The design rests on a lock, called witness encryption, that opens only for proof
 that a rule was met. The key to each Bitcoin vault is sealed in such a lock, and the
 rule is that the matching tokens were burned on Solana. The lock is the scheme of
 *Praxis: Practical Witness Encryption for NP*
-([ePrint 2026/2971](https://eprint.iacr.org/2026/2971)). Figure 1 shows the whole
-path.
+([ePrint 2026/2971](https://eprint.iacr.org/2026/2971)). The figure above shows the
+whole path.
 
 The main points are:
 
 - **The bridge model holds against the attacks tried.** Chapter 4 lists them. Three
   more succeed on purpose, to mark what the design trusts.
 - **One lock serves many uses.** A time lock is modelled as a second rule and a
-  reward for a solution runs as a toy demo. Five other uses are described and not
-  coded (Chapter 2).
+  reward for a solution runs as a toy demo. Eight other uses are described and not
+  coded, and six far-future ones are speculation (Chapter 2).
 - **The lock itself runs only at toy size.** `praxis_lock/` implements the scheme
   with real BN254 pairings on small statements. At the paper's parameters each
   sealed key piece is about 8 GB of public data, which this code cannot produce
@@ -84,7 +84,17 @@ operator in between. This project is independent. It is not affiliated with the
 paper's authors, Babylon, Bitcoin or Solana, and the bridge design here is not taken
 from the paper.
 
-**1.3** The bridge is one use of such a lock. The remainder of this document is set
+**1.3** Figure 1.A shows the problem the paper addresses and what it changes.
+
+**Figure 1.A: What the paper solves**
+
+<p align="center">
+  <img src="docs/solves.svg" width="900" alt="What the paper solves. Today, using Bitcoin as a guarantee means trusting other people: a company, which can fail or freeze your coins, or watchers, where one dispute has cost over $14,000. With the paper, coins are locked on Bitcoin and no person holds the key; someone shows a valid proof, for example that a loan was repaid; the lock opens by itself, with no keeper, no dispute and no new rules. What the paper changed: about 8 GB per lock, down from hundreds of terabytes; seconds to lock or unlock, as claimed; no change to Bitcoin, so no soft fork.">
+</p>
+
+<sub>Source: this repository. Sizes and times are the paper's claims. The dispute cost is the worst case reported for the challenge-based design in use today (BitVM2).</sub>
+
+**1.4** The bridge is one use of such a lock. The remainder of this document is set
 out as follows:
 
 - [Chapter 2](#chapter-2-one-lock-many-uses) shows other uses of the lock, says
@@ -99,7 +109,7 @@ out as follows:
 
 ### Running the code
 
-**1.4** Python 3.11 or newer. Nothing to install, except `py_ecc` if you want real
+**1.5** Python 3.11 or newer. Nothing to install, except `py_ecc` if you want real
 pairings. Box 1.A gives the commands.
 
 > **Box 1.A: Running the code**
@@ -117,7 +127,7 @@ pairings. Box 1.A gives the commands.
 
 ### Finding faults
 
-**1.5** The most useful thing you can do is find an attack that works. Write it as a
+**1.6** The most useful thing you can do is find an attack that works. Write it as a
 test (see `tests/test_bridge.py` for helpers that forge signatures and mine private
 forks) and open an issue. [CONTRIBUTING.md](CONTRIBUTING.md) explains what counts.
 
@@ -128,14 +138,31 @@ prove that a rule was met, and the rule can be any program that looks at evidenc
 and answers yes or no. The paper names these uses of witness encryption: public-key,
 identity-based and attribute-based encryption, time-lock encryption that opens once
 a blockchain reaches a given length, one-time programs, and on Bitcoin bridges
-without a custodian, proof verification and covenants. Figure 2.A shows the same
-lock with six rules.
+without a custodian, proof verification and covenants.
+
+**2.2** Figure 2.A groups the main use cases. Three of them are coded here in some form:
+moving Bitcoin to another network (the bridge, modelled), a time capsule (the time
+lock, modelled) and a prize that pays itself (the reward, as a toy demo).
+
+**Figure 2.A: Use cases**
 
 <p align="center">
-  <img src="docs/uses.svg" width="900" alt="Figure 2.A: One lock, many uses. A secret is sealed to a rule and opens for anyone who can prove the rule was met. Six rules: a bridge without a custodian and a time lock (both modelled here), a reward for a solution (toy demo here), and three that are not coded: sending to a credential, paying on Bitcoin for a proof, and spending rules on Bitcoin.">
+  <img src="docs/use-cases.svg" width="900" alt="Use cases, in two groups. Money on Bitcoin: borrow against Bitcoin with no company holding your coins; move Bitcoin to other networks without a trusted keeper (modelled here); self-custody safes with delays and approved addresses; prizes that pay themselves, with money released by a correct proof (toy demo here). Alarms and information: tripwire alarms, where coins move if encryption is broken; time capsules that open when Bitcoin reaches a block (modelled here); an inheritance switch that releases keys after missed check-ins; credential-locked files, readable only with proof of ID. Not yet proven: new and unreviewed, and it needs an honest one-time setup.">
 </p>
 
-**2.2** Table 2.A sets out what this repository has of each.
+<sub>Source: this repository.</sub>
+
+**2.3** Figure 2.B shows the same lock with six rules and how far each is coded.
+
+**Figure 2.B: One lock, many uses**
+
+<p align="center">
+  <img src="docs/uses.svg" width="900" alt="One lock, many uses. A secret is sealed to a rule and opens for anyone who can prove the rule was met. Six rules: a bridge without a custodian and a time lock (both modelled here), a reward for a solution (toy demo here), and three that are not coded: sending to a credential, paying on Bitcoin for a proof, and spending rules on Bitcoin.">
+</p>
+
+<sub>Source: this repository.</sub>
+
+**2.4** Table 2.A sets out what this repository has of each use.
 
 **Table 2.A: Uses of the lock and what this repository has of each**
 
@@ -150,39 +177,69 @@ lock with six rules.
 | Spending rules on Bitcoin (covenants) | this spend follows the rule the coins were sealed under | **Not coded** |
 | One-time programs | a program that can be run on one input only | **Not coded** |
 | Bridges to other chains | these tokens were burned on that chain | **Not coded.** Each chain needs its own proof that a burn is final |
+| Borrowing against Bitcoin | the loan was repaid, or it was not repaid in time | **Not coded** |
+| Tripwire alarm | here is a break of this cipher or hash function | **Not coded.** It would be the reward's rule with a different puzzle |
+| Inheritance switch | the owner has missed a set number of check-ins | **Not coded** |
 
 <sub>Source: this repository.</sub>
 
-**2.3** One lock can serve them all because, in the paper's design, every rule is
+**2.5** One lock can serve them all because, in the paper's design, every rule is
 run inside a zero-knowledge machine and its proof is wrapped into one small Groth16
 proof. The lock is then always sealed to the same kind of statement, "a valid proof
 exists for this program", which is what `praxis_lock/encoding/` writes out. A new
 use needs a new rule and nothing else.
 
-**2.4** Of the five stages in Figure 2.B, this repository has two rules (the
+**2.6** Of the five stages in Figure 2.C, this repository has two rules (the
 bridge's and a small time lock, both plain Python handed to the simulated lock), a
 toy Groth16 system, the proof checker with known gaps, and the lock at toy size. The
 zero-knowledge machine is not here at all, and nothing is joined up from end to end.
 
-<p align="center">
-  <img src="docs/pipeline.svg" width="900" alt="Figure 2.B: From a rule to a lock in five stages, with what this repository has of each. 1 The rule, a program that answers yes or no: two rules are written in plain Python, the bridge's and a small time lock. 2 Proof of the run by a zero-knowledge machine: not coded. 3 One small Groth16 proof: a toy system that makes real test proofs. 4 The proof checker as lock gates: built with gaps, 1.4 times the size the paper reports. 5 The lock: the real scheme on small statements only. Stages 2 to 5 are the same for every use.">
-</p>
-
-**2.5** Figure 2.C takes three of the uses that are not the bridge step by step.
+**Figure 2.C: From a rule to a lock: what is built here**
 
 <p align="center">
-  <img src="docs/examples.svg" width="900" alt="Figure 2.C: Three other locks step by step. Time lock (modelled here): anyone seals a message to Bitcoin growing 52,560 blocks past a block; about a year of blocks is mined; anyone shows the block headers and reads the message. Reward for a solution (toy demo here): a sponsor seals the key to a reward to a solution of a puzzle; someone finds one; the solver opens the lock, no judge decides. Sending to a credential (not coded): a sender seals a file to holding a registry's certificate; a doctor holds one; any holder opens it and the sender never learns who.">
+  <img src="docs/pipeline.svg" width="900" alt="From a rule to a lock in five stages, with what this repository has of each. 1 The rule, a program that answers yes or no: two rules are written in plain Python, the bridge's and a small time lock. 2 Proof of the run by a zero-knowledge machine: not coded. 3 One small Groth16 proof: a toy system that makes real test proofs. 4 The proof checker as lock gates: built with gaps, 1.4 times the size the paper reports. 5 The lock: the real scheme on small statements only. Stages 2 to 5 are the same for every use.">
 </p>
+
+<sub>Source: this repository. The five stages follow the design in the paper.</sub>
+
+**2.7** Figure 2.D takes three of the uses that are not the bridge step by step.
+
+**Figure 2.D: Three other locks, step by step**
+
+<p align="center">
+  <img src="docs/examples.svg" width="900" alt="Three other locks step by step. Time lock (modelled here): anyone seals a message to Bitcoin growing 52,560 blocks past a block; about a year of blocks is mined; anyone shows the block headers and reads the message. Reward for a solution (toy demo here): a sponsor seals the key to a reward to a solution of a puzzle; someone finds one; the solver opens the lock, no judge decides. Sending to a credential (not coded): a sender seals a file to holding a registry's certificate; a doctor holds one; any holder opens it and the sender never learns who.">
+</p>
+
+<sub>Source: this repository.</sub>
+
+### Further ahead
+
+**2.8** Figure 2.E looks much further ahead. These six are speculation by this
+repository's authors, not claims of the paper, and none is coded. Each needs the
+paper to survive review, sensors that can be trusted to report physical events, and
+a version of the scheme that is safe against quantum computers.
+
+**Figure 2.E: Far-future use cases**
+
+<p align="center">
+  <img src="docs/far-future.svg" width="900" alt="Far-future use cases, all speculation, in two groups. Space and deep time: trade across light-minutes that pays on proof with no contact needed; machines that own themselves and pay whoever proves a repair; knowledge with an entrance exam, which opens for whoever proves theorems. AI and other minds: answers from any kind of mind, where the answer is checked and not the mind; a superintelligence seismograph, where harder locks open as AI advances; human and AI treaties, with a stake lost on a broken promise. Needs three things first: the paper survives review, trusted sensors, and a quantum-safe version.">
+</p>
+
+<sub>Source: this repository. Speculation, not from the paper.</sub>
 
 ### Limits that every use shares
 
-**2.6** Figure 2.D summarises the limits that every use has to live with.
+**2.9** Figure 2.F summarises the limits that every use has to live with.
+
+**Figure 2.F: What every use has to live with**
 
 <p align="center">
-  <img src="docs/limits.svg" width="900" alt="Figure 2.D: What every use has to live with. 1 The rule is fixed when the lock is made and cannot be changed or withdrawn. 2 Whoever has a proof opens it, once and for all. 3 Evidence can be forged at a price. 4 Large and heavy: about 8 GB of public data for each sealed key piece in the paper, about 11 GB with this repository's encoding. 5 One setup for every lock: whoever kept its secret numbers can open every lock made for that key. 6 New and unreviewed, and not safe against quantum computers. On top of these, this repository has no security at all.">
+  <img src="docs/limits.svg" width="900" alt="What every use has to live with. 1 The rule is fixed when the lock is made and cannot be changed or withdrawn. 2 Whoever has a proof opens it, once and for all. 3 Evidence can be forged at a price. 4 Large and heavy: about 8 GB of public data for each sealed key piece in the paper, about 11 GB with this repository's encoding. 5 One setup for every lock: whoever kept its secret numbers can open every lock made for that key. 6 New and unreviewed, and not safe against quantum computers. On top of these, this repository has no security at all.">
 </p>
 
-**2.7** In full:
+<sub>Source: this repository. Sizes are from the paper and from this repository's encoding.</sub>
+
+**2.10** In full:
 
 - **The rule is fixed when the lock is made.** It sees nothing afterwards except
   what a proof shows it. Anything current, such as which block is the latest or
@@ -211,9 +268,13 @@ zero-knowledge machine is not here at all, and nothing is joined up from end to 
 
 **3.1** The bridge works in seven steps. Figure 3.A shows how they connect.
 
+**Figure 3.A: The seven steps of the bridge**
+
 <p align="center">
-  <img src="docs/steps.svg" width="900" alt="Figure 3.A: The seven steps of the bridge. On Bitcoin: 1 seal empty vaults, 2 deposit Bitcoin, 7 the vault opens for the burner. On Solana: 3 mint bridged Bitcoin, 4 launch a coin, 5 trade, priced in Bitcoin, 6 burn with a secret mark. Proof of deposit leads from step 2 to step 3; proof of the burn plus the secret leads from step 6 to step 7. Between deposit and opening, the Bitcoin stays sealed in the vault.">
+  <img src="docs/steps.svg" width="900" alt="The seven steps of the bridge. On Bitcoin: 1 seal empty vaults, 2 deposit Bitcoin, 7 the vault opens for the burner. On Solana: 3 mint bridged Bitcoin, 4 launch a coin, 5 trade, priced in Bitcoin, 6 burn with a secret mark. Proof of deposit leads from step 2 to step 3; proof of the burn plus the secret leads from step 6 to step 7. Between deposit and opening, the Bitcoin stays sealed in the vault.">
 </p>
+
+<sub>Source: this repository.</sub>
 
 1. **Seal.** A setup group creates an empty vault on Bitcoin. Each member makes one
    piece of the vault's key, locks it under the vault's rule and deletes it.
@@ -723,7 +784,7 @@ tests/test_praxis_lock.py 22 lock tests
 tests/test_encoding.py   50 encoding tests
 experiments/relations.py  four shrinking ideas, tested and found not to work
 demo.py, demo_lock.py, demo_encoding.py   narrated runs
-docs/overview.svg, uses.svg, pipeline.svg, examples.svg, limits.svg, steps.svg   the figures in this document
+docs/*.svg               the nine figures in this document
 docs/figures.py          draws them
 docs/number.py           numbers this document's paragraphs
 ```

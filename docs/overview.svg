@@ -1,95 +1,98 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 654" width="960" height="654" role="img" aria-labelledby="t d" font-family="Arial, Helvetica, 'Liberation Sans', sans-serif">
-<title id="t">Figure 1: A Bitcoin to Solana bridge with no operator</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 656" width="960" height="656" role="img" aria-labelledby="t d" font-family="Arial, Helvetica, 'Liberation Sans', sans-serif">
+<title id="t">A Bitcoin to Solana bridge with no operator</title>
 <desc id="d">Bitcoin is sent to a vault whose key is sealed in a lock. Solana mints the same amount as tokens. Tokens are used to launch and trade coins. Burning tokens gives a proof that opens the lock and releases the Bitcoin. The repository holds a model of the bridge, the lock scheme at toy size, and a proof checker written for the lock.</desc>
-<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#505A5F"/></marker></defs>
-<rect width="960" height="654" fill="#FFFFFF"/>
-<text x="40" y="38" font-size="17" fill="#0B0C0C" font-weight="700">Figure 1: A Bitcoin to Solana bridge with no operator</text>
-<line x1="40" y1="51" x2="920" y2="51" stroke="#0B0C0C" stroke-width="1.5"/>
-<text x="40" y="76" font-size="13.5" fill="#505A5F">Bitcoin is locked so that only proof of a burn on Solana can release it. This repository models that from end to end.</text>
-<rect x="40" y="97" width="98" height="19" fill="#F7E9EB"/>
-<text x="48" y="111" font-size="11" fill="#8F1D2C" font-weight="700" letter-spacing="0.8">ON BITCOIN</text>
-<rect x="40" y="124" width="200" height="120" fill="#FFFFFF" stroke="#B1B4B6"/>
-<rect x="40" y="124" width="4" height="120" fill="#8F1D2C"/>
-<rect x="56" y="137" width="22" height="22" fill="#F7E9EB"/>
-<text x="67.0" y="152.5" font-size="12.5" fill="#8F1D2C" font-weight="700" text-anchor="middle">1</text>
-<text x="87" y="153.5" font-size="15.5" fill="#0B0C0C" font-weight="700">Seal</text>
-<text x="56" y="182.0" font-size="12.5" fill="#0B0C0C">A vault is made. Its key is</text>
-<text x="56" y="199.5" font-size="12.5" fill="#0B0C0C">cut into pieces, each sealed</text>
-<text x="56" y="217.0" font-size="12.5" fill="#0B0C0C">in a lock, then deleted.</text>
-<rect x="267" y="124" width="200" height="120" fill="#FFFFFF" stroke="#B1B4B6"/>
-<rect x="267" y="124" width="4" height="120" fill="#8F1D2C"/>
-<rect x="283" y="137" width="22" height="22" fill="#F7E9EB"/>
-<text x="294.0" y="152.5" font-size="12.5" fill="#8F1D2C" font-weight="700" text-anchor="middle">2</text>
-<text x="314" y="153.5" font-size="15.5" fill="#0B0C0C" font-weight="700">Deposit</text>
-<text x="283" y="182.0" font-size="12.5" fill="#0B0C0C">A user sends Bitcoin to</text>
-<text x="283" y="199.5" font-size="12.5" fill="#0B0C0C">the vault.</text>
-<rect x="720" y="124" width="200" height="120" fill="#FFFFFF" stroke="#B1B4B6"/>
-<rect x="720" y="124" width="4" height="120" fill="#8F1D2C"/>
-<rect x="736" y="137" width="22" height="22" fill="#F7E9EB"/>
-<text x="747.0" y="152.5" font-size="12.5" fill="#8F1D2C" font-weight="700" text-anchor="middle">7</text>
-<text x="767" y="153.5" font-size="15.5" fill="#0B0C0C" font-weight="700">Open</text>
-<text x="736" y="182.0" font-size="12.5" fill="#0B0C0C">The proof opens the lock.</text>
-<text x="736" y="199.5" font-size="12.5" fill="#0B0C0C">The burner gets the key and</text>
-<text x="736" y="217.0" font-size="12.5" fill="#0B0C0C">moves the Bitcoin.</text>
-<rect x="493" y="124" width="200" height="120" fill="#F3F2F1" stroke="#505A5F" stroke-dasharray="5 4"/>
-<path d="M580.0 162 v-9 a13 13 0 0 1 26 0 v9" fill="none" stroke="#0B0C0C" stroke-width="5" stroke-linecap="round"/>
-<rect x="572.0" y="162" width="42" height="32" rx="3" fill="#0B0C0C"/>
-<circle cx="593.0" cy="175" r="4.2" fill="#F3F2F1"/><rect x="591.4" y="176" width="3.2" height="9" rx="1.6" fill="#F3F2F1"/>
-<text x="593.0" y="216" font-size="12.5" fill="#0B0C0C" font-weight="700" text-anchor="middle">Nobody holds the key.</text>
-<text x="593.0" y="233" font-size="12.5" fill="#505A5F" text-anchor="middle">Opens only for a valid proof.</text>
-<rect x="40" y="315" width="90" height="19" fill="#E7EEF5"/>
-<text x="48" y="329" font-size="11" fill="#1D4E7A" font-weight="700" letter-spacing="0.8">ON SOLANA</text>
-<text x="40" y="362" font-size="12.5" fill="#505A5F">The rule that always holds:</text>
-<text x="40" y="384" font-size="14" fill="#0B0C0C" font-weight="700">tokens in circulation</text>
-<text x="40" y="403" font-size="14" fill="#0B0C0C" font-weight="700">= Bitcoin sealed in vaults</text>
-<rect x="267" y="312" width="200" height="120" fill="#FFFFFF" stroke="#B1B4B6"/>
-<rect x="267" y="312" width="4" height="120" fill="#1D4E7A"/>
-<rect x="283" y="325" width="22" height="22" fill="#E7EEF5"/>
-<text x="294.0" y="340.5" font-size="12.5" fill="#1D4E7A" font-weight="700" text-anchor="middle">3</text>
-<text x="314" y="341.5" font-size="15.5" fill="#0B0C0C" font-weight="700">Mint</text>
-<text x="283" y="370.0" font-size="12.5" fill="#0B0C0C">Solana checks the deposit</text>
-<text x="283" y="387.5" font-size="12.5" fill="#0B0C0C">against Bitcoin's blocks and</text>
-<text x="283" y="405.0" font-size="12.5" fill="#0B0C0C">mints the same amount.</text>
-<rect x="493" y="312" width="200" height="120" fill="#FFFFFF" stroke="#B1B4B6"/>
-<rect x="493" y="312" width="4" height="120" fill="#1D4E7A"/>
-<rect x="509" y="325" width="36" height="22" fill="#E7EEF5"/>
-<text x="527.0" y="340.5" font-size="12.5" fill="#1D4E7A" font-weight="700" text-anchor="middle">4–5</text>
-<text x="554" y="341.5" font-size="15.5" fill="#0B0C0C" font-weight="700">Launch, trade</text>
-<text x="509" y="370.0" font-size="12.5" fill="#0B0C0C">Tokens move like any others:</text>
-<text x="509" y="387.5" font-size="12.5" fill="#0B0C0C">launch a coin against them,</text>
-<text x="509" y="405.0" font-size="12.5" fill="#0B0C0C">buy and sell it.</text>
-<rect x="720" y="312" width="200" height="120" fill="#FFFFFF" stroke="#B1B4B6"/>
-<rect x="720" y="312" width="4" height="120" fill="#1D4E7A"/>
-<rect x="736" y="325" width="22" height="22" fill="#E7EEF5"/>
-<text x="747.0" y="340.5" font-size="12.5" fill="#1D4E7A" font-weight="700" text-anchor="middle">6</text>
-<text x="767" y="341.5" font-size="15.5" fill="#0B0C0C" font-weight="700">Burn</text>
-<text x="736" y="370.0" font-size="12.5" fill="#0B0C0C">A holder burns tokens and</text>
-<text x="736" y="387.5" font-size="12.5" fill="#0B0C0C">attaches the fingerprint of</text>
-<text x="736" y="405.0" font-size="12.5" fill="#0B0C0C">a secret.</text>
-<line x1="243" y1="184.0" x2="263" y2="184.0" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
-<line x1="470" y1="184.0" x2="489" y2="184.0" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
-<line x1="696" y1="184.0" x2="716" y2="184.0" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
-<line x1="470" y1="372.0" x2="489" y2="372.0" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
-<line x1="696" y1="372.0" x2="716" y2="372.0" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
-<line x1="367.0" y1="248" x2="367.0" y2="307" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
-<line x1="820.0" y1="308" x2="820.0" y2="249" stroke="#505A5F" stroke-width="1.6" marker-end="url(#a)"/>
-<text x="379.0" y="282.5" font-size="12.5" fill="#505A5F" font-style="italic">proof of deposit</text>
-<text x="808.0" y="282.5" font-size="12.5" fill="#505A5F" text-anchor="end" font-style="italic">proof of burn, plus the secret</text>
-<line x1="40" y1="462" x2="920" y2="462" stroke="#B1B4B6" stroke-width="1"/>
-<text x="40" y="490" font-size="15.5" fill="#0B0C0C" font-weight="700">What is in the repository</text>
-<rect x="40" y="504" width="280" height="84" fill="#FFFFFF" stroke="#B1B4B6"/>
-<text x="56" y="531" font-size="13.5" fill="#0B0C0C" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">bridge_sim/</text>
-<text x="56" y="553" font-size="12.5" fill="#505A5F">The whole bridge as a runnable model,</text>
-<text x="56" y="570" font-size="12.5" fill="#505A5F">attacks included. Its lock is simulated.</text>
-<rect x="340" y="504" width="280" height="84" fill="#FFFFFF" stroke="#B1B4B6"/>
-<text x="356" y="531" font-size="13.5" fill="#0B0C0C" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">praxis_lock/</text>
-<text x="356" y="553" font-size="12.5" fill="#505A5F">The lock scheme itself, from the Praxis</text>
-<text x="356" y="570" font-size="12.5" fill="#505A5F">paper, at toy size with real pairings.</text>
-<rect x="640" y="504" width="280" height="84" fill="#FFFFFF" stroke="#B1B4B6"/>
-<text x="656" y="531" font-size="13.5" fill="#0B0C0C" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">praxis_lock/encoding/</text>
-<text x="656" y="553" font-size="12.5" fill="#505A5F">A proof checker rewritten for the lock.</text>
-<text x="656" y="570" font-size="12.5" fill="#505A5F">Runs on real proofs, 1.4× the paper's size.</text>
-<line x1="40" y1="600" x2="920" y2="600" stroke="#B1B4B6" stroke-width="1"/>
-<text x="40" y="620" font-size="12.5" fill="#0B0C0C"><tspan font-weight="700">Simulator only.</tspan> No real network, no real money, not audited.</text>
-<text x="40" y="639" font-size="11.5" fill="#505A5F">Source: Bitcoin Witness Bridge Simulator.</text>
+<defs><marker id="r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#AF292E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker><marker id="g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#505A5F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="960" height="656" fill="#FFFFFF"/>
+<rect x="40" y="20" width="880" height="44" fill="#AF292E"/>
+<text x="60" y="47.5" font-size="15.5" fill="#FFFFFF" font-weight="700">A Bitcoin to Solana bridge with no operator</text>
+<rect x="40" y="78" width="200" height="30" fill="#8A2024"/>
+<text x="60" y="98.5" font-size="15.5" fill="#FFFFFF" font-weight="700">On Bitcoin</text>
+<rect x="40" y="118" width="200" height="112" fill="#F3F2F1"/>
+<rect x="40" y="118" width="6" height="112" fill="#AF292E"/>
+<rect x="62" y="129" width="22" height="22" fill="#AF292E"/>
+<text x="73.0" y="144.5" font-size="12.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">1</text>
+<text x="93" y="145" font-size="15" fill="#0B0C0C" font-weight="700">Seal</text>
+<text x="62" y="165" font-size="12.5" fill="#505A5F">A vault is made. Its key is</text>
+<text x="62" y="182" font-size="12.5" fill="#505A5F">cut into pieces, each sealed</text>
+<text x="62" y="199" font-size="12.5" fill="#505A5F">in a lock, then deleted.</text>
+<rect x="267" y="118" width="200" height="112" fill="#F3F2F1"/>
+<rect x="267" y="118" width="6" height="112" fill="#AF292E"/>
+<rect x="289" y="129" width="22" height="22" fill="#AF292E"/>
+<text x="300.0" y="144.5" font-size="12.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">2</text>
+<text x="320" y="145" font-size="15" fill="#0B0C0C" font-weight="700">Deposit</text>
+<text x="289" y="165" font-size="12.5" fill="#505A5F">A user sends Bitcoin to</text>
+<text x="289" y="182" font-size="12.5" fill="#505A5F">the vault.</text>
+<rect x="493" y="118" width="200" height="112" fill="#F3F2F1"/>
+<rect x="493" y="118" width="6" height="112" fill="#505A5F"/>
+<text x="515" y="145" font-size="15" fill="#0B0C0C" font-weight="700">Nobody holds the key</text>
+<text x="515" y="165" font-size="12.5" fill="#505A5F">The Bitcoin waits in the</text>
+<text x="515" y="182" font-size="12.5" fill="#505A5F">vault. The lock opens only</text>
+<text x="515" y="199" font-size="12.5" fill="#505A5F">for a valid proof.</text>
+<rect x="720" y="118" width="200" height="112" fill="#F3F2F1"/>
+<rect x="720" y="118" width="6" height="112" fill="#00703C"/>
+<rect x="742" y="129" width="22" height="22" fill="#00703C"/>
+<text x="753.0" y="144.5" font-size="12.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">7</text>
+<text x="773" y="145" font-size="15" fill="#0B0C0C" font-weight="700">Open</text>
+<text x="742" y="165" font-size="12.5" fill="#505A5F">The proof opens the lock.</text>
+<text x="742" y="182" font-size="12.5" fill="#505A5F">The burner gets the key and</text>
+<text x="742" y="199" font-size="12.5" fill="#505A5F">moves the Bitcoin.</text>
+<rect x="40" y="300" width="200" height="30" fill="#8A2024"/>
+<text x="60" y="320.5" font-size="15.5" fill="#FFFFFF" font-weight="700">On Solana</text>
+<text x="40" y="358" font-size="12.5" fill="#505A5F">The rule that always holds:</text>
+<text x="40" y="380" font-size="14" fill="#0B0C0C" font-weight="700">tokens in circulation</text>
+<text x="40" y="399" font-size="14" fill="#0B0C0C" font-weight="700">= Bitcoin sealed in vaults</text>
+<rect x="267" y="300" width="200" height="112" fill="#F3F2F1"/>
+<rect x="267" y="300" width="6" height="112" fill="#AF292E"/>
+<rect x="289" y="311" width="22" height="22" fill="#AF292E"/>
+<text x="300.0" y="326.5" font-size="12.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">3</text>
+<text x="320" y="327" font-size="15" fill="#0B0C0C" font-weight="700">Mint</text>
+<text x="289" y="347" font-size="12.5" fill="#505A5F">Solana checks the deposit</text>
+<text x="289" y="364" font-size="12.5" fill="#505A5F">against Bitcoin's blocks and</text>
+<text x="289" y="381" font-size="12.5" fill="#505A5F">mints the same amount.</text>
+<rect x="493" y="300" width="200" height="112" fill="#F3F2F1"/>
+<rect x="493" y="300" width="6" height="112" fill="#AF292E"/>
+<rect x="515" y="311" width="36" height="22" fill="#AF292E"/>
+<text x="533.0" y="326.5" font-size="12.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">4–5</text>
+<text x="560" y="327" font-size="15" fill="#0B0C0C" font-weight="700">Launch, trade</text>
+<text x="515" y="347" font-size="12.5" fill="#505A5F">Tokens move like any others:</text>
+<text x="515" y="364" font-size="12.5" fill="#505A5F">launch a coin against them,</text>
+<text x="515" y="381" font-size="12.5" fill="#505A5F">buy and sell it.</text>
+<rect x="720" y="300" width="200" height="112" fill="#F3F2F1"/>
+<rect x="720" y="300" width="6" height="112" fill="#AF292E"/>
+<rect x="742" y="311" width="22" height="22" fill="#AF292E"/>
+<text x="753.0" y="326.5" font-size="12.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">6</text>
+<text x="773" y="327" font-size="15" fill="#0B0C0C" font-weight="700">Burn</text>
+<text x="742" y="347" font-size="12.5" fill="#505A5F">A holder burns tokens and</text>
+<text x="742" y="364" font-size="12.5" fill="#505A5F">attaches the fingerprint of</text>
+<text x="742" y="381" font-size="12.5" fill="#505A5F">a secret.</text>
+<line x1="244" y1="174.0" x2="262" y2="174.0" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<line x1="471" y1="174.0" x2="488" y2="174.0" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<line x1="697" y1="174.0" x2="715" y2="174.0" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<line x1="471" y1="356.0" x2="488" y2="356.0" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<line x1="697" y1="356.0" x2="715" y2="356.0" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<line x1="367.0" y1="235" x2="367.0" y2="294" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<line x1="820.0" y1="295" x2="820.0" y2="236" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<text x="379.0" y="269.5" font-size="12.5" fill="#505A5F" font-style="italic">proof of deposit</text>
+<text x="808.0" y="269.5" font-size="12.5" fill="#505A5F" text-anchor="end" font-style="italic">proof of burn, plus the secret</text>
+<rect x="40" y="436" width="880" height="36" fill="#8A2024"/>
+<text x="60" y="459.5" font-size="15.5" fill="#FFFFFF" font-weight="700">What is in the repository</text>
+<rect x="40" y="482" width="280" height="84" fill="#FFFFFF" stroke="#B1B4B6" stroke-width="0.75"/>
+<rect x="40" y="482" width="280" height="4" fill="#AF292E"/>
+<text x="58" y="513" font-size="13.5" fill="#0B0C0C" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">bridge_sim/</text>
+<text x="58" y="533" font-size="12.5" fill="#505A5F">The whole bridge as a runnable model,</text>
+<text x="58" y="550" font-size="12.5" fill="#505A5F">attacks included. Its lock is simulated.</text>
+<rect x="340" y="482" width="280" height="84" fill="#FFFFFF" stroke="#B1B4B6" stroke-width="0.75"/>
+<rect x="340" y="482" width="280" height="4" fill="#AF292E"/>
+<text x="358" y="513" font-size="13.5" fill="#0B0C0C" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">praxis_lock/</text>
+<text x="358" y="533" font-size="12.5" fill="#505A5F">The lock scheme itself, from the Praxis</text>
+<text x="358" y="550" font-size="12.5" fill="#505A5F">paper, at toy size with real pairings.</text>
+<rect x="640" y="482" width="280" height="84" fill="#FFFFFF" stroke="#B1B4B6" stroke-width="0.75"/>
+<rect x="640" y="482" width="280" height="4" fill="#AF292E"/>
+<text x="658" y="513" font-size="13.5" fill="#0B0C0C" font-weight="700" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">praxis_lock/encoding/</text>
+<text x="658" y="533" font-size="12.5" fill="#505A5F">A proof checker rewritten for the lock.</text>
+<text x="658" y="550" font-size="12.5" fill="#505A5F">Runs on real proofs, 1.4× the paper's size.</text>
+<rect x="40" y="576" width="880" height="60" fill="#F3F2F1"/>
+<rect x="40" y="576" width="6" height="60" fill="#505A5F"/>
+<text x="62" y="603" font-size="15" fill="#0B0C0C" font-weight="700">Simulator only</text>
+<text x="62" y="623" font-size="12.5" fill="#505A5F">No real network, no real money, not audited</text>
 </svg>

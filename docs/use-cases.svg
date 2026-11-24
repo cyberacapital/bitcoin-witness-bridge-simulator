@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 516" width="960" height="516" role="img" aria-labelledby="t d" font-family="Arial, Helvetica, 'Liberation Sans', sans-serif">
+<title id="t">Use cases</title>
+<desc id="d">Two groups. Money on Bitcoin: borrowing against Bitcoin, moving Bitcoin to other networks (modelled here), self-custody safes, prizes that pay themselves (toy demo here). Alarms and information: tripwire alarms, time capsules (modelled here), an inheritance switch, credential-locked files. The paper is new and unreviewed and needs an honest one-time setup.</desc>
+<defs><marker id="r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#AF292E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker><marker id="g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#505A5F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="960" height="516" fill="#FFFFFF"/>
+<rect x="200" y="20" width="560" height="44" fill="#AF292E"/>
+<text x="480.0" y="47.5" font-size="15.5" fill="#FFFFFF" font-weight="700" text-anchor="middle">Use cases</text>
+<path d="M480 64 L480 80.0 L255 80.0 L255 96" fill="none" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<path d="M480 64 L480 80.0 L705 80.0 L705 96" fill="none" stroke="#AF292E" stroke-width="1.6" marker-end="url(#r)"/>
+<rect x="40" y="100" width="430" height="38" fill="#8A2024"/>
+<text x="60" y="124.5" font-size="15.5" fill="#FFFFFF" font-weight="700">Money on Bitcoin</text>
+<rect x="490" y="100" width="430" height="38" fill="#8A2024"/>
+<text x="510" y="124.5" font-size="15.5" fill="#FFFFFF" font-weight="700">Alarms and information</text>
+<rect x="40" y="148" width="430" height="60" fill="#F3F2F1"/>
+<rect x="40" y="148" width="6" height="60" fill="#AF292E"/>
+<text x="62" y="175" font-size="15" fill="#0B0C0C" font-weight="700">Borrow against Bitcoin</text>
+<text x="62" y="195" font-size="12.5" fill="#505A5F">No company holds your coins</text>
+<rect x="40" y="218" width="430" height="60" fill="#F3F2F1"/>
+<rect x="40" y="218" width="6" height="60" fill="#AF292E"/>
+<text x="62" y="245" font-size="15" fill="#0B0C0C" font-weight="700">Move Bitcoin to other networks</text>
+<text x="62" y="265" font-size="12.5" fill="#505A5F">Without a trusted keeper</text>
+<rect x="333" y="239" width="123" height="19" fill="#AF292E" stroke="#AF292E"/>
+<text x="341" y="253" font-size="11" fill="#FFFFFF" font-weight="700" letter-spacing="0.8">MODELLED HERE</text>
+<rect x="40" y="288" width="430" height="60" fill="#F3F2F1"/>
+<rect x="40" y="288" width="6" height="60" fill="#AF292E"/>
+<text x="62" y="315" font-size="15" fill="#0B0C0C" font-weight="700">Self-custody safes</text>
+<text x="62" y="335" font-size="12.5" fill="#505A5F">Delays and approved addresses</text>
+<rect x="40" y="358" width="430" height="60" fill="#F3F2F1"/>
+<rect x="40" y="358" width="6" height="60" fill="#AF292E"/>
+<text x="62" y="385" font-size="15" fill="#0B0C0C" font-weight="700">Prizes that pay themselves</text>
+<text x="62" y="405" font-size="12.5" fill="#505A5F">Money released by a correct proof</text>
+<rect x="333" y="379" width="123" height="19" fill="#FFFFFF" stroke="#AF292E"/>
+<text x="341" y="393" font-size="11" fill="#AF292E" font-weight="700" letter-spacing="0.8">TOY DEMO HERE</text>
+<rect x="490" y="148" width="430" height="60" fill="#F3F2F1"/>
+<rect x="490" y="148" width="6" height="60" fill="#AF292E"/>
+<text x="512" y="175" font-size="15" fill="#0B0C0C" font-weight="700">Tripwire alarms</text>
+<text x="512" y="195" font-size="12.5" fill="#505A5F">Coins move if encryption is broken</text>
+<rect x="490" y="218" width="430" height="60" fill="#F3F2F1"/>
+<rect x="490" y="218" width="6" height="60" fill="#AF292E"/>
+<text x="512" y="245" font-size="15" fill="#0B0C0C" font-weight="700">Time capsules</text>
+<text x="512" y="265" font-size="12.5" fill="#505A5F">Opens when Bitcoin reaches a block</text>
+<rect x="783" y="239" width="123" height="19" fill="#AF292E" stroke="#AF292E"/>
+<text x="791" y="253" font-size="11" fill="#FFFFFF" font-weight="700" letter-spacing="0.8">MODELLED HERE</text>
+<rect x="490" y="288" width="430" height="60" fill="#F3F2F1"/>
+<rect x="490" y="288" width="6" height="60" fill="#AF292E"/>
+<text x="512" y="315" font-size="15" fill="#0B0C0C" font-weight="700">Inheritance switch</text>
+<text x="512" y="335" font-size="12.5" fill="#505A5F">Releases keys after missed check-ins</text>
+<rect x="490" y="358" width="430" height="60" fill="#F3F2F1"/>
+<rect x="490" y="358" width="6" height="60" fill="#AF292E"/>
+<text x="512" y="385" font-size="15" fill="#0B0C0C" font-weight="700">Credential-locked files</text>
+<text x="512" y="405" font-size="12.5" fill="#505A5F">Readable only with proof of ID</text>
+<rect x="40" y="436" width="880" height="60" fill="#F3F2F1"/>
+<rect x="40" y="436" width="6" height="60" fill="#505A5F"/>
+<text x="62" y="463" font-size="15" fill="#0B0C0C" font-weight="700">Not yet proven</text>
+<text x="62" y="483" font-size="12.5" fill="#505A5F">New and unreviewed; needs an honest one-time setup</text>
+</svg>
