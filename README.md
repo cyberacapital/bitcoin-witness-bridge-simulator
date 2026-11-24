@@ -4,14 +4,17 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > **Simulator only. This is not a bridge.** It touches no real network and no real
-> money. The witness-encryption lock is simulated, because no public code for it
-> exists yet. The design is a first draft written with an AI assistant and has not
-> been reviewed by cryptographers. Do not put funds behind anything derived from it
-> without independent audits.
+> money. The bridge model uses a simulated lock, and the real lock included here runs
+> only at toy parameters with no security. Everything is a first draft written with
+> an AI assistant and has not been reviewed by cryptographers. Do not put funds
+> behind anything derived from it without independent audits.
 
-A runnable model of a trust-minimised Bitcoin to Solana bridge built on witness
-encryption, with coin launches priced in the bridged Bitcoin and 34 tests that
-attack it. It exists so people can read the logic, run it, and try to break it.
+Two things in one repository, both meant to be read, run and attacked:
+
+- **`bridge_sim/`** A runnable model of a trust-minimised Bitcoin to Solana bridge
+  built on witness encryption, with coin launches priced in the bridged Bitcoin.
+- **`praxis_lock/`** A reference implementation of the witness-encryption scheme
+  itself, at toy parameters, with real BN254 pairings.
 
 The idea comes from *Praxis: Practical Witness Encryption for NP* (Tse, Vanjani,
 Vesely, [ePrint 2026/2971](https://eprint.iacr.org/2026/2971)): lock a Bitcoin key so
@@ -21,13 +24,16 @@ Bitcoin or Solana, and the bridge design here is not taken from the paper.
 
 ## Try it in one minute
 
-Python 3.11 or newer, nothing to install.
+Python 3.11 or newer. Nothing to install, except `py_ecc` if you want real pairings.
 
 ```
 git clone https://github.com/CyberaCapital/bitcoin-witness-bridge-simulator
 cd bitcoin-witness-bridge-simulator
-python demo.py            # a narrated run: bridge, launch a coin, trade, redeem
-python -m unittest -v     # 34 tests, about 8 seconds
+python demo.py                 # the bridge: deposit, launch a coin, trade, redeem
+python demo_lock.py --fast     # the lock, on a backend that hides nothing
+pip install py_ecc
+python demo_lock.py            # the lock with real BN254 pairings (about 25 s)
+python -m unittest -v          # 56 tests, about 35 s with py_ecc, 12 s without
 ```
 
 ## Try to break it
@@ -35,6 +41,55 @@ python -m unittest -v     # 34 tests, about 8 seconds
 The most useful thing you can do is find an attack that works. Write it as a test
 (see `tests/test_bridge.py` for helpers that forge signatures and mine private
 forks) and open an issue. [CONTRIBUTING.md](CONTRIBUTING.md) explains what counts.
+
+## The lock itself (`praxis_lock/`)
+
+A Python transcription of the Praxis scheme from the definitions in the authors'
+machine-checked Lean development
+([psivesely/praxis-lean](https://github.com/psivesely/praxis-lean)): the statement
+format, the quadratic arithmetic program, the extension-field weights, encryption,
+and decryption ending in a small search.
+
+```python
+from praxis_lock import (BN254Groups, Params, encrypt, decrypt, pad,
+                         product_equals, number_bits)
+
+# Statement: "two 8-bit numbers whose product is 47,053".
+P = Params.toy(N=16, gates=1, U=2, n=8, d=2, K1=2, g=7)
+statement = pad(P, [product_equals(range(1, 9), range(9, 17), 47053)])
+G = BN254Groups()
+ciphertext = encrypt(G, P, statement, b"a key piece for a Bitcoin vault.")
+
+factors = [1] + number_bits(211, 8) + number_bits(223, 8)
+decrypt(G, P, statement, ciphertext, factors)                                  # the secret
+decrypt(G, P, statement, ciphertext, [1] + number_bits(211, 8) + number_bits(222, 8))  # None
+```
+
+On BN254 that ciphertext is 808 group elements, about 48 KB; locking takes about
+15 seconds and opening about 10, in pure Python.
+
+What the tests establish:
+
+- A solution opens the ciphertext, across eight parameter sets and random
+  statements, and with real pairings on BN254. Wrong answers do not.
+- The identities the Lean correctness proof rests on hold numerically.
+- The fast decryption formulas equal the literal sums written in the Lean text.
+- The paper's own parameters pass this code's structural checks, and its element
+  counts reproduce the published ciphertext size (about 7.9 GiB).
+
+What it is not:
+
+- **Not secure.** Toy statements have a handful of unknown bits and can be solved
+  by trying every answer. Security needs the paper's parameters.
+- **Not able to run at the paper's parameters.** Those need an 8 GB ciphertext and
+  polynomials of degree 3.8 million; this code is quadratic-time Python.
+- **Not checked against the paper's text**, only against the Lean definitions. It
+  follows Lean where the two differ (the key is derived from the pair of labels of
+  the key element and its negation).
+- **Not connected to a proof system.** The paper locks to a Groth16 verifier, so
+  any statement can be used through a proof. That encoding is not built here;
+  statements are written directly as small gate systems.
+- **Not hardened.** No constant-time code, no audit, slow reference pairings.
 
 ## How the bridge works
 
@@ -105,7 +160,7 @@ retired validator set could forge a burn. With it, Bitcoin's block order decides
 
 | Part | In this model | In a real bridge |
 |---|---|---|
-| Witness-encryption lock | Simulated: an object that releases its secret only when the rule accepts | A public ciphertext of about 8 GB per key piece |
+| Witness-encryption lock | The bridge model uses a simulated lock: an object that releases its secret only when the rule accepts. The real scheme is in `praxis_lock/`, at toy parameters, not yet wired to the bridge | A public ciphertext of about 8 GB per key piece |
 | The vault rule | Real logic, in plain Python | The same logic compiled into a zero-knowledge circuit |
 | Bitcoin | Real proof of work, Merkle proofs and coin tracking at tiny difficulty; no fees or scripts | Bitcoin |
 | Solana | Four validators signing state roots by stake | Over a thousand validators, different signatures, and a light-client proof nobody has shipped in this form |
@@ -190,9 +245,17 @@ bridge_sim/bridge.py     the program on Solana
 bridge_sim/launchpad.py  coin launches and trading pools priced in bridged Bitcoin
 bridge_sim/client.py     relaying, anchoring, building a proof
 bridge_sim/scenario.py   a ready-made world for tests and the demo
+praxis_lock/params.py    parameters, their structural checks, the paper's values
+praxis_lock/relation.py  statements as gates over Boolean unknowns
+praxis_lock/qap.py       the quadratic arithmetic program and honest quotients
+praxis_lock/kummer.py    forms from a seed, extension-field weights, the grid of cells
+praxis_lock/groups.py    exponent backend (no secrecy) and BN254 backend
+praxis_lock/scheme.py    encrypt and decrypt
+praxis_lock/reference.py the decryption sums exactly as the Lean text writes them
 tests/test_bridge.py     25 bridge tests
 tests/test_launchpad.py  9 launch and trading tests
-demo.py                  narrated run
+tests/test_praxis_lock.py 22 lock tests
+demo.py, demo_lock.py    narrated runs
 ```
 
 ## Next stages
@@ -200,12 +263,15 @@ demo.py                  narrated run
 1. Port the Solana program and the Bitcoin side to real test networks, keeping the
    lock simulated.
 2. Write the vault rule as a zero-knowledge program and prove real burns.
-3. Replace the simulated lock with the paper's scheme once code exists, run a real
-   setup, and get independent audits before any real funds.
+3. Rewrite the lock in a compiled language with fast polynomial arithmetic, so it
+   can run at the paper's parameters, and build the Groth16 verifier encoding.
+4. Replace the bridge's simulated lock with it, run a real setup, and get
+   independent audits before any real funds.
 
 ## What stops this from being a real bridge today
 
-- No public code exists for the witness-encryption scheme, and the paper is unreviewed.
+- The lock here runs only at toy parameters. No implementation at secure parameters
+  exists, here or publicly, and the paper is unreviewed.
 - The vault rule is plain Python. A real lock needs it as a zero-knowledge circuit,
   including proofs of Solana finality and of Bitcoin's history since sealing.
 - The setup-honesty proof over an 8 GB ciphertext is an unsolved engineering problem.
@@ -214,6 +280,10 @@ demo.py                  narrated run
 
 ## Licence and credits
 
-MIT licence; see [LICENSE](LICENSE). Designed and written with Claude, an AI
-assistant made by Anthropic, and published by CyberaCapital. Corrections and attacks
-are welcome.
+MIT licence; see [LICENSE](LICENSE). The `praxis_lock/` directory is derived from
+the authors' Apache-2.0 Lean development and is under the Apache License 2.0; see
+`praxis_lock/NOTICE`. The scheme, its parameters and its proofs are the work of
+David Tse, Nikhil Vanjani and Psi Vesely.
+
+Designed and written with Claude, an AI assistant made by Anthropic, and published
+by CyberaCapital. Corrections and attacks are welcome.
