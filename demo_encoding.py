@@ -85,10 +85,10 @@ def part_two() -> None:
     assert c.satisfied
 
     paper = Params.paper()
-    print(f"\nThe paper's own encoding of this check uses {paper.N:,} bits and {paper.gates_max:,} gates.")
-    print(f"This one uses about {c.n_bits / paper.N:.0f} times as many bits. It is a first, plain")
-    print("encoding built from scratch, not the paper's method, and it has known gaps;")
-    print("see the README. Closing that distance is the open work.")
+    print(f"\nThe paper's own encoding of this check uses {paper.N:,} bits and 1,692 constraints.")
+    print(f"This one uses about {c.n_bits / paper.N:.0f} times as many bits. The paper does not say how its")
+    print("encoding is built; this one was written from scratch and has known gaps.")
+    print("The README sets out where the difference comes from.")
 
 
 if __name__ == "__main__":

@@ -27,17 +27,21 @@ show the assumption is weaker or more expensive than the README says.
 
 ## Check the encoding
 
-`praxis_lock/encoding/` writes a Groth16 proof checker as lock gates. It was built
-without the paper's construction to follow.
+`praxis_lock/encoding/` writes a Groth16 proof checker as lock gates. The paper
+reports the size of its own encoding but not how it is built, so this one was
+written from first principles.
 
 - Find an assignment that satisfies the verifier gates for a statement that is
   false. Two routes are already known and listed in the README (a second proof
   point outside the right subgroup, and point additions with an undefined slope);
   a working exploit of either is still worth having as a test. Anything else is a
   real finding.
-- Make it smaller. The paper reports 391,693 bits and 1,694 gates; this encoding
-  uses about 8.5 million bits. `Circuit.stages` shows where they go.
-- Compare it with the paper's own encoding and describe the differences.
+- Make it smaller. The paper reports 391,693 bits and 1,692 constraints; this
+  encoding uses about 8.5 million bits. `Circuit.stages` shows where they go, and
+  the README lists two steps not yet taken: wide gates, and folding the root check
+  into the pairing loop.
+- If the authors publish their encoding, compare the two and describe the
+  differences.
 
 ## Improve it
 

@@ -103,10 +103,11 @@ The lock understands one kind of statement: a list of simple equations, called
 gates, over unknown bits. To lock a Bitcoin key to "someone holds a valid proof",
 the program that checks a proof has to be rewritten as such a list, so that the
 bits of a valid proof are exactly what solves it. The paper does this for the
-Groth16 proof checker and reports the size of the result. This directory is an
-independent attempt at the same job. It was written from first principles,
-without the paper's construction to follow, so it is a different encoding and a
-much larger one.
+Groth16 proof checker and reports the size of the result (Section 6.1). It does
+not describe how its encoding is built, and the authors' repository does not
+contain it; their README says they plan to verify the encoding in a future update.
+This directory is an independent attempt at the same job, written from first
+principles. It is a different encoding and a much larger one.
 
 How it is built, from the bottom up:
 
@@ -136,7 +137,8 @@ g.encode_verifier(vk, [47053], proof).satisfied   # True: the same test as lock 
 g.encode_verifier(vk, [47054], proof).satisfied   # False
 ```
 
-Measured size, for one verifying key and one public input:
+Measured size, for one verifying key and one public input, which are fixed into
+the gates as constants, as they are in the paper's encoding:
 
 | Part | Unknown bits | Gates |
 |---|---|---|
@@ -144,10 +146,11 @@ Measured size, for one verifying key and one public input:
 | The two pairings that involve the proof, sharing one loop | about 4.26 million | 26,097 |
 | The final check, as a root raised back to its power | about 4.24 million | 25,488 |
 | **This encoding, in total** | **about 8.51 million** | **51,631** |
-| The paper's encoding | 391,693 | 1,694 |
+| The paper's encoding | 391,693 | 1,692 |
 
-No gate holds more than 69 products; the paper's format allows 2,047. The bit count
-moves by a few hundred from one verifying key to another.
+No gate here holds more than 69 products. The paper's encoding goes the other way:
+each of its constraints holds at least 254 products, and its format allows up to
+2,047. The bit count here moves by a few hundred from one verifying key to another.
 
 What the tests establish:
 
@@ -181,16 +184,29 @@ What it is not:
   that the proof's second point lies in the right subgroup, and it does not rule
   out the special cases of point addition where a slope is undefined. A real
   encoding must close both. The tests show that the forgeries tried here fail;
-  they do not show that every forgery fails.
-- **Not general.** The verifying key and the public input are fixed into the gates.
+  they do not show that every forgery fails. The paper states that every solution
+  of its encoding decodes to a proof the checker accepts; this one cannot say that.
 - **Not a proof system to use.** The Groth16 setup and prover here exist to make
   test proofs; the prover uses the setup's secret numbers.
 
-Where the bits go: half are the root check, and across the whole encoding about
-three quarters of the bits are quotients and carries, not values. Two known ways
-to shrink it are to fold the root check into the pairing loop (the method of
-Novakovic and Eagen's *On Proving Pairings*) and to use the wide gates the lock
-allows.
+### Why it is 22 times larger
+
+The paper gives its encoding's size and shape, not its method, so this is read
+from its numbers. Its system has about 231 bits per constraint. A base-field
+number takes 254 bits, so there is room for at most about 1,540 base-field numbers
+in total and very little bookkeeping. This encoding stores about 8,680 base-field
+numbers, and three quarters of its bits are quotients and carries.
+
+| Step | Unknown bits | Times the paper |
+|---|---|---|
+| As built | about 8.51 million | 22 |
+| With wide gates, which the paper's numbers point to: each product is one bit times a long sum, with the constants reduced beforehand, so a check needs about 40 bookkeeping bits where it now needs about 700. Counted from the checks this encoding makes, not built | about 2.55 million | 6.5 |
+| And with the root check folded into the pairing loop, the method of Novakovic and Eagen's *On Proving Pairings*. An estimate | about 1.4 million | about 3.7 |
+
+Wide gates have a price: up to 3,048 products in a gate, above the paper's 2,047,
+and about 2^33.6 non-zero coefficients where the paper reports about 2^30. What
+remains after both steps is a leaner way of evaluating the pairing, with fewer
+intermediate values, which the paper does not describe.
 
 ## How the bridge works
 
@@ -317,8 +333,12 @@ A vault that has already been redeemed is not exposed; a test confirms this.
 2. More than two thirds of each validator set, by stake, is honest until its
    hand-off is confirmed on Bitcoin.
 3. Nobody finds it worthwhile to mine the waiting period in secret.
-4. The witness-encryption mathematics holds. The paper is new and unreviewed, and
-   it is not safe against quantum computers.
+4. The witness-encryption mathematics holds. The paper is new and unreviewed, aims
+   at 100-bit security, and is not safe against quantum computers.
+5. The proof system's own setup was honest. The paper locks to a Groth16 proof
+   checker, and it says plainly that whoever ran that setup and kept its secret
+   numbers can make accepting proofs for anything, and so open every lock made
+   for that key.
 
 ## Not modelled, or still open
 
@@ -371,7 +391,9 @@ demo.py, demo_lock.py, demo_encoding.py   narrated runs
 
 1. Port the Solana program and the Bitcoin side to real test networks, keeping the
    lock simulated.
-2. Write the vault rule as a zero-knowledge program and prove real burns.
+2. Write the vault rule as a zero-knowledge program and prove real burns. The
+   paper's route is a program for a zero-knowledge virtual machine whose proofs
+   end in Groth16, so that one fixed proof checker serves every program.
 3. Shrink the proof-checker encoding towards the paper's size and close its known
    gaps.
 4. Rewrite the lock in a compiled language with fast polynomial arithmetic, so it
